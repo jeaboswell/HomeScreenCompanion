@@ -1297,12 +1297,16 @@
                 <div class="hsc-sub-tab-nav">
                     <button class="hsc-sub-tab-btn active" data-hsc-tab="manage">Manage</button>
                     <button class="hsc-sub-tab-btn" data-hsc-tab="copy">Copy &amp; Sync</button>
+                    <button class="hsc-sub-tab-btn" data-hsc-tab="tweaks">Home Screen Tweaks</button>
                 </div>
                 <div id="hscSubTabManage" class="hsc-sub-tab-content verticalSection">
                     <div id="hscManageContainer"></div>
                 </div>
                 <div id="hscSubTabCopy" class="hsc-sub-tab-content verticalSection" style="display:none;">
                     <div id="hscContainer"></div>
+                </div>
+                <div id="hscSubTabTweaks" class="hsc-sub-tab-content verticalSection" style="display:none;">
+                    <div id="hstContainer"></div>
                 </div>
             </div>
 
@@ -1699,7 +1703,7 @@
                     <i class="md-icon help-section-icon">home</i>
                     <span>Home Screen</span>
                 </div>
-                <div class="step-text" style="margin-bottom:10px; font-size:0.92em;">The <strong>Home Screen</strong> tab has two independent sub-sections: <strong>Manage</strong> (source-based rows) and <strong>Copy &amp; Sync</strong> (copy one user's layout to others).</div>
+                <div class="step-text" style="margin-bottom:10px; font-size:0.92em;">The <strong>Home Screen</strong> tab has three independent sub-sections: <strong>Manage</strong> (source-based rows), <strong>Copy &amp; Sync</strong> (copy one user's layout to others) and <strong>Home Screen Tweaks</strong> (adjustments to Emby's built-in rows).</div>
                 <div class="help-feature-row">
                     <i class="md-icon help-feat-icon">view_list</i>
                     <div><strong>Manage</strong> — Creates and keeps custom home screen rows up to date. Each row is tied to one of your sources and is automatically refreshed for the selected users every time sync runs. To set up a row for a source, open that source card and go to its <em>Home Screen</em> tab.</div>
@@ -1707,6 +1711,10 @@
                 <div class="help-feature-row">
                     <i class="md-icon help-feat-icon">copy_all</i>
                     <div><strong>Copy &amp; Sync</strong> — Copies the complete home screen layout from one user to one or more other users. Handy when you want all profiles to look the same. This runs separately from the tag and collection sync.</div>
+                </div>
+                <div class="help-feature-row">
+                    <i class="md-icon help-feat-icon">tune</i>
+                    <div><strong>Home Screen Tweaks</strong> — <em>Continue Watching</em>: when a new episode arrives for a series you had watched to the end, the series moves to the front of Continue Watching / Next Up. Watched status is never changed. Runs automatically when new episodes are added, plus the scheduled task <em>Continue Watching Bump</em>.</div>
                 </div>
                 <div class="help-feature-row" style="margin-bottom:0;">
                     <i class="md-icon help-feat-icon">sync</i>

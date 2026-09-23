@@ -3379,6 +3379,9 @@ define(['emby-input', 'emby-button', 'emby-select', 'emby-checkbox'], function (
         var hscEnabled      = view.querySelector('#chkHscEnabled');
         var hscSource       = view.querySelector('#selHscSourceUser');
         var hscLibraryOrder = view.querySelector('#chkHscLibraryOrder');
+        var cwbEnabled      = view.querySelector('#chkCwbEnabled');
+        var cwbMode         = view.querySelector('#selCwbMode');
+        var cwbAllUsers     = view.querySelector('#chkCwbAllUsers');
 
         return {
             TraktClientId: view.querySelector('#txtTraktClientId').value,
@@ -3404,7 +3407,13 @@ define(['emby-input', 'emby-button', 'emby-select', 'emby-checkbox'], function (
             HomeSyncSourceUserId: hscSource ? (hscSource.value || '') : (lastHscConfig.HomeSyncSourceUserId || ''),
             HomeSyncTargetUserIds: hscEnabled
                 ? Array.from(view.querySelectorAll('.hsc-target-chk:checked')).map(function(c) { return c.value; })
-                : (lastHscConfig.HomeSyncTargetUserIds || [])
+                : (lastHscConfig.HomeSyncTargetUserIds || []),
+            ContinueWatchingBumpEnabled: cwbEnabled ? cwbEnabled.checked : (lastHscConfig.ContinueWatchingBumpEnabled || false),
+            ContinueWatchingBumpMode: cwbMode ? (cwbMode.value || 'AllEpisodes') : (lastHscConfig.ContinueWatchingBumpMode || 'AllEpisodes'),
+            ContinueWatchingBumpAllUsers: cwbAllUsers ? cwbAllUsers.checked : (lastHscConfig.ContinueWatchingBumpAllUsers || false),
+            ContinueWatchingBumpUserIds: cwbEnabled
+                ? Array.from(view.querySelectorAll('.cwb-user-chk:checked')).map(function(c) { return c.value; })
+                : (lastHscConfig.ContinueWatchingBumpUserIds || [])
         };
     }
 
@@ -3728,6 +3737,117 @@ define(['emby-input', 'emby-button', 'emby-select', 'emby-checkbox'], function (
             });
     }
 
+
+    // ── Home Screen Tweaks ───────────────────────────────────────────────────
+    // Expandable panels in the same style as the Settings tab (.settings-panel —
+    // toggled by the delegated click handler, so no per-panel wiring is needed).
+
+    function renderHstTab(container, config, users) {
+        var cwbUserIds   = config.ContinueWatchingBumpUserIds || [];
+        var cwbUserRows  = users.map(function (u) {
+            var checked = cwbUserIds.indexOf(u.Id) >= 0 ? ' checked' : '';
+            return '<div class="hsc-user-row"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;width:100%;">' +
+                '<input is="emby-checkbox" type="checkbox" class="cwb-user-chk" value="' + u.Id + '"' + checked + ' />' +
+                '<span>' + u.Name + '</span>' +
+                '</label></div>';
+        }).join('');
+        var cwbEnabled   = config.ContinueWatchingBumpEnabled ? ' checked' : '';
+        var cwbAllUsers  = config.ContinueWatchingBumpAllUsers ? ' checked' : '';
+        var cwbMode      = config.ContinueWatchingBumpMode || 'AllEpisodes';
+        var cwbDisplay   = config.ContinueWatchingBumpEnabled ? '' : 'none';
+        var cwbUsersDisp = config.ContinueWatchingBumpAllUsers ? 'none' : '';
+
+        container.innerHTML = [
+            '<div class="advanced-section settings-panel" style="margin-bottom: 15px;">',
+            '<div class="advanced-header settings-panel-toggle">',
+            '<span style="font-size: 1.05em; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #52B54B;">Continue Watching</span>',
+            '<i class="md-icon settings-panel-chevron" style="margin-left: auto; transition: transform 0.2s;">expand_more</i>',
+            '</div>',
+            '<div class="advanced-body settings-panel-body" style="display:none; padding-top: 4px;">',
+
+            '<div style="display:flex; align-items:flex-start; gap:8px; margin:0 0 12px; padding:8px 12px; border:1px solid rgba(255,152,0,0.5); border-radius:4px; background:rgba(255,152,0,0.08); font-size:0.85em; line-height:1.45;">',
+            '<i class="md-icon" style="color:#FF9800; font-size:1.2em;">warning</i>',
+            '<div><strong style="color:#FF9800;">Experimental.</strong> Safe to use — it never changes watched status, only the "last played" date of one episode. It has been tested, but needs more real-world use before it can be considered fully stable.</div>',
+            '</div>',
+
+            '<p style="font-size:0.9em; line-height:1.5; margin:0 0 24px;">',
+            'Emby sorts Continue Watching by when you last watched a series, so a show you finished a year ago stays far down the row even when a new season arrives. ',
+            'This moves such a series to the front as soon as a new episode is added.',
+            '</p>',
+
+            '<div class="checkboxContainer checkboxContainer-withDescription">',
+            '<label><input is="emby-checkbox" type="checkbox" id="chkCwbEnabled"' + cwbEnabled + ' /><span>Bump series with new episodes to the front of Continue Watching</span></label>',
+            '<div class="fieldDescription">Applies only to series you had watched up to the end. It bumps once per new episode: if the new episode stays unwatched, later episodes do not bump it again. Runs about 2 minutes after a library scan, plus the scheduled task <em>Continue Watching Bump</em> as a catch-up.</div>',
+            '</div>',
+            '<div id="cwbConfig" style="display:' + cwbDisplay + '">',
+            '<div class="inputContainer" style="margin-top:16px;">',
+            '<select is="emby-select" id="selCwbMode" label="Bump when">',
+            '<option value="AllEpisodes"' + (cwbMode === 'AllEpisodes' ? ' selected' : '') + '>Any new episode arrives</option>',
+            '<option value="NewSeasonsOnly"' + (cwbMode === 'NewSeasonsOnly' ? ' selected' : '') + '>A new season arrives</option>',
+            '</select>',
+            '<div class="fieldDescription">"A new season" only bumps when the next episode to watch starts a new season (e.g. S02E01 after finishing season 1).</div>',
+            '</div>',
+            '<div class="checkboxContainer checkboxContainer-withDescription" style="margin-top:8px;">',
+            '<label><input is="emby-checkbox" type="checkbox" id="chkCwbAllUsers"' + cwbAllUsers + ' /><span>All users</span></label>',
+            '<div class="fieldDescription">Applies to every user, including users added later.</div>',
+            '</div>',
+            '<div id="cwbUserListWrap" style="display:' + cwbUsersDisp + '">',
+            '<p class="textMuted" style="font-size:0.88em;margin:12px 0;">Bump Continue Watching for these users:</p>',
+            '<div class="hsc-user-list" id="cwbUserList">',
+            cwbUserRows || '<p class="textMuted" style="font-size:0.85em;">No users found.</p>',
+            '</div>',
+            '</div>',
+            '</div>',
+
+            '<div style="margin-top:16px; padding:10px 14px; border:1px solid rgba(128,128,128,0.2); border-radius:4px;">',
+            '<div style="font-size:0.75em; font-weight:700; text-transform:uppercase; letter-spacing:1.4px; opacity:0.6; margin-bottom:6px;">Good to know</div>',
+            '<ul style="font-size:0.85em; line-height:1.5; margin:0; padding-left:18px; opacity:0.85;">',
+            '<li>The <strong>"last played" date</strong> of your last watched episode is set to now. Watched status and play count are unchanged, but anything showing or sorting by last played (e.g. watch history, tag rules using <em>Last played</em>) will see the new date.</li>',
+            '<li><strong>Replacing an unwatched episode</strong> (e.g. a quality upgrade) makes it look newly added and can bump the series again.</li>',
+            '<li>No bump if you <strong>skipped episodes</strong> — every episode up to your last watched one must be played. Specials (season 0) are ignored.</li>',
+            '<li>A series you have <strong>hidden</strong> from Continue Watching stays hidden.</li>',
+            '</ul>',
+            '</div>',
+
+            '</div>',
+            '</div>'
+        ].join('');
+
+        container.dataset.loaded = '1';
+    }
+
+    function loadHstTab(view) {
+        var container = view.querySelector('#hstContainer');
+        if (!container) return;
+
+        window.ApiClient.getJSON(window.ApiClient.getUrl('Users', { IsDisabled: false }))
+            .then(function (users) {
+                renderHstTab(container, lastHscConfig, users || []);
+
+                var cwbEnableChk = container.querySelector('#chkCwbEnabled');
+                if (cwbEnableChk) {
+                    cwbEnableChk.addEventListener('change', function () {
+                        var cwbConfig = container.querySelector('#cwbConfig');
+                        if (cwbConfig) cwbConfig.style.display = this.checked ? '' : 'none';
+                    });
+                }
+                var cwbAllUsersChk = container.querySelector('#chkCwbAllUsers');
+                if (cwbAllUsersChk) {
+                    cwbAllUsersChk.addEventListener('change', function () {
+                        var wrap = container.querySelector('#cwbUserListWrap');
+                        if (wrap) wrap.style.display = this.checked ? 'none' : '';
+                    });
+                }
+
+                container.querySelectorAll('input, select').forEach(function (el) {
+                    el.addEventListener('change', function () { setTimeout(checkFormState, 0); });
+                    el.addEventListener('input',  function () { setTimeout(checkFormState, 0); });
+                });
+            })
+            .catch(function () {
+                container.innerHTML = '<p class="textMuted" style="padding:20px;">Failed to load users. Check server connection.</p>';
+            });
+    }
 
     function getManDragAfterElement(container, y) {
         var els = [...container.querySelectorAll('.man-section-row:not(.man-dragging)')];
@@ -5631,7 +5751,7 @@ define(['emby-input', 'emby-button', 'emby-select', 'emby-checkbox'], function (
         { key: 'Tags',         label: 'Tag & collection groups',   desc: 'All source groups incl. schedules, blacklists, filters, collection settings, home sections and playlists.' },
         { key: 'SavedFilters', label: 'Saved media-info filters',  desc: 'Your saved filter presets.' },
         { key: 'TopLists',     label: 'Top lists',                 desc: 'Top-list settings and the movie lists of manual top-lists.' },
-        { key: 'HomeSync',     label: 'Home screen sync',          desc: 'Source user, target users and library-order sync.' }
+        { key: 'HomeSync',     label: 'Home screen sync',          desc: 'Source user, target users, library-order sync and Continue Watching bump.' }
     ];
 
     function buildBackupModalShell() {
@@ -6967,7 +7087,11 @@ define(['emby-input', 'emby-button', 'emby-select', 'emby-checkbox'], function (
                     HomeSyncEnabled:       config.HomeSyncEnabled       || false,
                     HomeSyncLibraryOrder:  config.HomeSyncLibraryOrder  || false,
                     HomeSyncSourceUserId:  config.HomeSyncSourceUserId  || '',
-                    HomeSyncTargetUserIds: config.HomeSyncTargetUserIds || []
+                    HomeSyncTargetUserIds: config.HomeSyncTargetUserIds || [],
+                    ContinueWatchingBumpEnabled:  config.ContinueWatchingBumpEnabled  || false,
+                    ContinueWatchingBumpMode:     config.ContinueWatchingBumpMode     || 'AllEpisodes',
+                    ContinueWatchingBumpAllUsers: config.ContinueWatchingBumpAllUsers || false,
+                    ContinueWatchingBumpUserIds:  config.ContinueWatchingBumpUserIds  || []
                 };
                 savedFilters = config.SavedFilters || [];
 
@@ -7096,6 +7220,10 @@ define(['emby-input', 'emby-button', 'emby-select', 'emby-checkbox'], function (
                 view.querySelector('#hscSubTabCopy').style.display = '';
                 var hscContainer = view.querySelector('#hscContainer');
                 if (hscContainer && !hscContainer.dataset.loaded) loadHscUsers(view);
+            } else if (target === 'tweaks') {
+                view.querySelector('#hscSubTabTweaks').style.display = '';
+                var hstContainer = view.querySelector('#hstContainer');
+                if (hstContainer && !hstContainer.dataset.loaded) loadHstTab(view);
             } else if (target === 'manage') {
                 view.querySelector('#hscSubTabManage').style.display = '';
                 var manageContainer = view.querySelector('#hscManageContainer');

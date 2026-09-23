@@ -51,11 +51,15 @@ namespace HomeScreenCompanion
 
         private async Task<List<ExternalItemDto>> FetchMdblist(string listUrl, string apiKey, int limit, CancellationToken cancellationToken)
         {
-            if (!string.IsNullOrWhiteSpace(apiKey))
-                return await FetchMdblistApi(listUrl, apiKey, limit, cancellationToken);
-            else
+            if (IsMdblistOfficialList(listUrl) || string.IsNullOrWhiteSpace(apiKey))
                 return await FetchMdblistLegacy(listUrl, limit, cancellationToken);
+            else
+                return await FetchMdblistApi(listUrl, apiKey, limit, cancellationToken);
         }
+
+        // Official lists (mdblist.com/lists/official/...) have no api.mdblist.com endpoint, only the public /json one
+        private static bool IsMdblistOfficialList(string url) =>
+            url.IndexOf("/lists/official/", StringComparison.OrdinalIgnoreCase) >= 0;
 
         // Uses api.mdblist.com — works for both public and private lists
         private async Task<List<ExternalItemDto>> FetchMdblistApi(string listUrl, string apiKey, int limit, CancellationToken cancellationToken)
@@ -99,7 +103,10 @@ namespace HomeScreenCompanion
         // Legacy fallback: mdblist.com/slug/json — public lists only, no API key needed
         private async Task<List<ExternalItemDto>> FetchMdblistLegacy(string listUrl, int limit, CancellationToken cancellationToken)
         {
-            var cleanUrl = listUrl.Trim().TrimEnd('/');
+            var cleanUrl = listUrl.Trim();
+            int queryIndex = cleanUrl.IndexOfAny(new[] { '?', '#' });
+            if (queryIndex >= 0) cleanUrl = cleanUrl.Substring(0, queryIndex);
+            cleanUrl = cleanUrl.TrimEnd('/');
             if (!cleanUrl.EndsWith("/json")) cleanUrl += "/json";
 
             const int pageSize = 1000;

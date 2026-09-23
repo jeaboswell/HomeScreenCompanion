@@ -335,6 +335,11 @@ namespace HomeScreenCompanion
         public string HomeSyncSourceUserId { get; set; } = "";
         public List<string> HomeSyncTargetUserIds { get; set; } = new List<string>();
         public bool HomeSyncLibraryOrder { get; set; }
+        // Nullable so backups made before this feature leave the current settings alone.
+        public bool? ContinueWatchingBumpEnabled { get; set; }
+        public string? ContinueWatchingBumpMode { get; set; }
+        public bool? ContinueWatchingBumpAllUsers { get; set; }
+        public List<string>? ContinueWatchingBumpUserIds { get; set; }
     }
 
     public class BackupTopList
@@ -2533,7 +2538,11 @@ public class HomeScreenCompanionService : IService
                     HomeSyncEnabled       = config.HomeSyncEnabled,
                     HomeSyncSourceUserId  = config.HomeSyncSourceUserId ?? "",
                     HomeSyncTargetUserIds = (config.HomeSyncTargetUserIds ?? new List<string>()).ToList(),
-                    HomeSyncLibraryOrder  = config.HomeSyncLibraryOrder
+                    HomeSyncLibraryOrder  = config.HomeSyncLibraryOrder,
+                    ContinueWatchingBumpEnabled  = config.ContinueWatchingBumpEnabled,
+                    ContinueWatchingBumpMode     = config.ContinueWatchingBumpMode ?? ContinueWatchingBumper.ModeAllEpisodes,
+                    ContinueWatchingBumpAllUsers = config.ContinueWatchingBumpAllUsers,
+                    ContinueWatchingBumpUserIds  = (config.ContinueWatchingBumpUserIds ?? new List<string>()).ToList()
                 };
                 file.Sections.Add("HomeSync");
             }
@@ -2635,6 +2644,14 @@ public class HomeScreenCompanionService : IService
                         }
                     }
                     PruneUnknownUsers(config.HomeSyncTargetUserIds, knownUsers, response.Warnings, "Home screen sync targets");
+                    if (h.ContinueWatchingBumpEnabled.HasValue)  config.ContinueWatchingBumpEnabled  = h.ContinueWatchingBumpEnabled.Value;
+                    if (!string.IsNullOrEmpty(h.ContinueWatchingBumpMode)) config.ContinueWatchingBumpMode = h.ContinueWatchingBumpMode!;
+                    if (h.ContinueWatchingBumpAllUsers.HasValue) config.ContinueWatchingBumpAllUsers = h.ContinueWatchingBumpAllUsers.Value;
+                    if (h.ContinueWatchingBumpUserIds != null)
+                    {
+                        config.ContinueWatchingBumpUserIds = h.ContinueWatchingBumpUserIds.ToList();
+                        PruneUnknownUsers(config.ContinueWatchingBumpUserIds, knownUsers, response.Warnings, "Continue Watching bump users");
+                    }
                     response.Applied.Add("Home screen sync");
                 }
 

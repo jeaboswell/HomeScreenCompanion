@@ -39,6 +39,12 @@ namespace HomeScreenCompanion
         public string HomeSyncSourceUserId { get; set; } = "";
         public List<string> HomeSyncTargetUserIds { get; set; } = new List<string>();
         public bool HomeSyncLibraryOrder { get; set; } = false;
+
+        // Continue Watching bump: moves a finished series to the front of Next Up when a new episode arrives.
+        public bool ContinueWatchingBumpEnabled { get; set; } = false;
+        public string ContinueWatchingBumpMode { get; set; } = "AllEpisodes"; // "AllEpisodes" | "NewSeasonsOnly"
+        public bool ContinueWatchingBumpAllUsers { get; set; } = false;
+        public List<string> ContinueWatchingBumpUserIds { get; set; } = new List<string>();
     }
 
     public class TagConfig
