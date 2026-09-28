@@ -3,6 +3,7 @@ using HttpRequestOptions = MediaBrowser.Common.Net.HttpRequestOptions;
 using SkiaSharp;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
+using MediaBrowser.Controller.Net;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.IO;
@@ -23,6 +24,7 @@ using System.Threading.Tasks;
 namespace HomeScreenCompanion
 {
     [Route("/HomeScreenCompanion/TestUrl", "GET")]
+    [Authenticated(Roles = "Admin")]
     public class TestUrlRequest : IReturn<TestUrlResponse>
     {
         public string Url { get; set; } = string.Empty;
@@ -30,9 +32,11 @@ namespace HomeScreenCompanion
     }
 
     [Route("/HomeScreenCompanion/Status", "GET")]
+    [Authenticated(Roles = "Admin")]
     public class GetStatusRequest : IReturn<StatusResponse> { }
 
     [Route("/HomeScreenCompanion/Version", "GET")]
+    [Authenticated(Roles = "Admin")]
     public class VersionRequest : IReturn<VersionResponse> { }
 
     public class VersionResponse
@@ -41,6 +45,7 @@ namespace HomeScreenCompanion
     }
 
     [Route("/HomeScreenCompanion/UploadCollectionImage", "POST")]
+    [Authenticated(Roles = "Admin")]
     public class UploadCollectionImageRequest : IReturn<UploadCollectionImageResponse>
     {
         public string FileName { get; set; } = "";
@@ -49,6 +54,7 @@ namespace HomeScreenCompanion
     }
 
     [Route("/HomeScreenCompanion/FetchCollectionImageFromUrl", "POST")]
+    [Authenticated(Roles = "Admin")]
     public class FetchCollectionImageFromUrlRequest : IReturn<UploadCollectionImageResponse>
     {
         public string Url { get; set; } = "";
@@ -78,6 +84,7 @@ namespace HomeScreenCompanion
     }
 
     [Route("/HomeScreenCompanion/RunEntry", "POST")]
+    [Authenticated(Roles = "Admin")]
     public class RunEntryRequest : IReturn<RunEntryResponse>
     {
         public string EntryName { get; set; } = "";
@@ -90,37 +97,45 @@ namespace HomeScreenCompanion
     }
 
     [Route("/HomeScreenCompanion/Hsc/Status", "GET")]
+    [Authenticated(Roles = "Admin")]
     public class HscGetStatusRequest : IReturn<HscSyncStatusResponse> { }
 
     [Route("/HomeScreenCompanion/DebugSections", "GET")]
+    [Authenticated(Roles = "Admin")]
     public class DebugSectionsRequest : IReturn<string>
     {
         public string UserId { get; set; } = string.Empty;
     }
 
     [Route("/HomeScreenCompanion/Manage/Tags", "GET")]
+    [Authenticated(Roles = "Admin")]
     public class GetManagedTagsRequest : IReturn<GetManagedTagsResponse> { }
     public class ManagedTagInfo { public string Id { get; set; } = ""; public string Name { get; set; } = ""; public int ItemCount { get; set; } public int MovieCount { get; set; } public List<string> ItemTypes { get; set; } = new List<string>(); }
     public class GetManagedTagsResponse { public List<ManagedTagInfo> Tags { get; set; } = new List<ManagedTagInfo>(); }
 
     [Route("/HomeScreenCompanion/Manage/Collections", "GET")]
+    [Authenticated(Roles = "Admin")]
     public class GetManagedCollectionsRequest : IReturn<GetManagedCollectionsResponse> { }
     public class ManagedCollectionInfo { public string Id { get; set; } = ""; public string Name { get; set; } = ""; public int ItemCount { get; set; } }
     public class GetManagedCollectionsResponse { public List<ManagedCollectionInfo> Collections { get; set; } = new List<ManagedCollectionInfo>(); }
 
     [Route("/HomeScreenCompanion/Manage/DeleteTag", "POST")]
+    [Authenticated(Roles = "Admin")]
     public class DeleteManagedTagRequest : IReturn<DeleteManagedTagResponse> { public string TagName { get; set; } = ""; }
     public class DeleteManagedTagResponse { public bool Success { get; set; } public string Message { get; set; } = ""; public int ItemsUpdated { get; set; } }
 
     [Route("/HomeScreenCompanion/Manage/DeleteTags", "POST")]
+    [Authenticated(Roles = "Admin")]
     public class DeleteManagedTagsBatchRequest : IReturn<DeleteManagedTagsResponse> { public List<string> TagNames { get; set; } = new List<string>(); }
     public class DeleteManagedTagsResponse { public bool Success { get; set; } public int ItemsUpdated { get; set; } }
 
     [Route("/HomeScreenCompanion/Manage/DeleteCollection", "POST")]
+    [Authenticated(Roles = "Admin")]
     public class DeleteManagedCollectionRequest : IReturn<DeleteManagedCollectionResponse> { public string CollectionId { get; set; } = ""; }
     public class DeleteManagedCollectionResponse { public bool Success { get; set; } public string Message { get; set; } = ""; }
 
     [Route("/HomeScreenCompanion/TopList/Status", "GET")]
+    [Authenticated(Roles = "Admin")]
     public class GetTopListStatusRequest : IReturn<TopListStatusResponse> { }
     public class TopListStatusResponse
     {
@@ -131,6 +146,7 @@ namespace HomeScreenCompanion
     }
 
     [Route("/HomeScreenCompanion/TopList/PrepareFolder", "POST")]
+    [Authenticated(Roles = "Admin")]
     public class PrepareTopListFolderRequest : IReturn<PrepareTopListFolderResponse>
     {
         public string TagName { get; set; } = "";
@@ -146,6 +162,7 @@ namespace HomeScreenCompanion
     }
 
     [Route("/HomeScreenCompanion/TopList/List", "GET")]
+    [Authenticated(Roles = "Admin")]
     public class GetTopListsRequest : IReturn<GetTopListsResponse> { }
     public class GetTopListsResponse
     {
@@ -154,6 +171,7 @@ namespace HomeScreenCompanion
     }
 
     [Route("/HomeScreenCompanion/TopList/ManualItems", "GET")]
+    [Authenticated(Roles = "Admin")]
     public class GetManualTopListItemsRequest : IReturn<GetManualTopListItemsResponse>
     {
         public string ListName { get; set; } = "";
@@ -171,6 +189,7 @@ namespace HomeScreenCompanion
     }
 
     [Route("/HomeScreenCompanion/TopList/Delete", "POST")]
+    [Authenticated(Roles = "Admin")]
     public class DeleteTopListRequest : IReturn<DeleteTopListResponse>
     {
         public string TagName { get; set; } = "";
@@ -183,6 +202,7 @@ namespace HomeScreenCompanion
     }
 
     [Route("/HomeScreenCompanion/TopList/SyncHomeSections", "POST")]
+    [Authenticated(Roles = "Admin")]
     public class PrepareTopListHomeSectionsRequest : IReturn<PrepareTopListHomeSectionsResponse>
     {
         public string TagName { get; set; } = "";
@@ -197,6 +217,7 @@ namespace HomeScreenCompanion
     }
 
     [Route("/HomeScreenCompanion/TopList/SyncAllSections", "POST")]
+    [Authenticated(Roles = "Admin")]
     public class SyncAllTopListSectionsRequest : IReturn<SyncAllTopListSectionsResponse> { }
     public class SyncAllTopListSectionsResponse
     {
@@ -206,6 +227,7 @@ namespace HomeScreenCompanion
     }
 
     [Route("/HomeScreenCompanion/TopList/MergeVersions", "POST")]
+    [Authenticated(Roles = "Admin")]
     public class MergeTopListVersionsRequest : IReturn<MergeTopListVersionsResponse>
     {
         public string TagName { get; set; } = "";
@@ -218,7 +240,22 @@ namespace HomeScreenCompanion
         public string Message { get; set; } = "";
     }
 
+    [Route("/HomeScreenCompanion/TopList/IndexStatus", "GET")]
+    [Authenticated(Roles = "Admin")]
+    public class GetTopListIndexStatusRequest : IReturn<TopListIndexStatusResponse>
+    {
+        public string FolderPath { get; set; } = "";
+    }
+    public class TopListIndexStatusResponse
+    {
+        public bool Success { get; set; }
+        public int Indexed { get; set; }
+        public int Identified { get; set; }
+        public string Message { get; set; } = "";
+    }
+
     [Route("/HomeScreenCompanion/TopList/AllMovies", "GET")]
+    [Authenticated(Roles = "Admin")]
     public class GetAllMoviesRequest : IReturn<GetAllMoviesResponse> { }
     public class MovieItem
     {
@@ -233,6 +270,7 @@ namespace HomeScreenCompanion
     }
 
     [Route("/HomeScreenCompanion/TopList/GrantLibraryAccess", "POST")]
+    [Authenticated(Roles = "Admin")]
     public class GrantTopListLibraryAccessRequest : IReturn<GrantTopListLibraryAccessResponse>
     {
         public string LibraryId { get; set; } = "";
@@ -245,6 +283,7 @@ namespace HomeScreenCompanion
     }
 
     [Route("/HomeScreenCompanion/TopList/SnapshotPolicies", "POST")]
+    [Authenticated(Roles = "Admin")]
     public class SnapshotPoliciesRequest : IReturn<SnapshotPoliciesResponse> { }
     public class SnapshotPoliciesResponse
     {
@@ -255,6 +294,7 @@ namespace HomeScreenCompanion
     }
 
     [Route("/HomeScreenCompanion/TopList/RestoreAndGrantAccess", "POST")]
+    [Authenticated(Roles = "Admin")]
     public class RestoreAndGrantAccessRequest : IReturn<RestoreAndGrantAccessResponse>
     {
         public string SnapshotId { get; set; } = "";
@@ -268,6 +308,7 @@ namespace HomeScreenCompanion
     }
 
     [Route("/HomeScreenCompanion/TopList/PrepareManualFolder", "POST")]
+    [Authenticated(Roles = "Admin")]
     public class PrepareManualTopListFolderRequest : IReturn<PrepareTopListFolderResponse>
     {
         public string ListName { get; set; } = "";
@@ -281,6 +322,7 @@ namespace HomeScreenCompanion
     }
 
     [Route("/HomeScreenCompanion/Backup/Export", "POST")]
+    [Authenticated(Roles = "Admin")]
     public class ExportBackupRequest : IReturn<BackupFile>
     {
         public bool Settings { get; set; } = true;
@@ -317,6 +359,7 @@ namespace HomeScreenCompanion
         public bool LogMissingItems { get; set; }
         public bool DryRunMode { get; set; }
         public bool PreserveTagsOnEmptyResult { get; set; } = true;
+        public bool TopListMirrorCollections { get; set; }
     }
 
     public class BackupApiKeys
@@ -359,6 +402,7 @@ namespace HomeScreenCompanion
     }
 
     [Route("/HomeScreenCompanion/Backup/Import", "POST")]
+    [Authenticated(Roles = "Admin")]
     public class ImportBackupRequest : IReturn<ImportBackupResponse>
     {
         public string BackupJson { get; set; } = "";
@@ -1229,6 +1273,40 @@ public class HomeScreenCompanionService : IService
             }
         }
 
+        // Read-only: how many .strm files in a top-list folder Emby has indexed as movies, and how
+        // many of those are identified (IMDb id resolved). The creation flow polls this after
+        // triggering the library scan so the home section is only finalised once items exist.
+        public object Get(GetTopListIndexStatusRequest request)
+        {
+            try
+            {
+                var topListsFolder = Path.Combine(Plugin.Instance.DataFolderPath, "toplists") + Path.DirectorySeparatorChar;
+                var folderPrefix = Path.GetFullPath(request.FolderPath ?? "").TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+                if (!folderPrefix.StartsWith(topListsFolder, StringComparison.OrdinalIgnoreCase))
+                    return new TopListIndexStatusResponse { Success = false, Message = "FolderPath is not a top-list folder." };
+
+                var items = _libraryManager.GetItemList(new InternalItemsQuery
+                {
+                    IncludeItemTypes = new[] { "Movie" },
+                    Recursive = true,
+                    IsVirtualItem = false
+                }).Where(i => !string.IsNullOrEmpty(i.Path)
+                           && i.Path.StartsWith(folderPrefix, StringComparison.OrdinalIgnoreCase))
+                  .ToList();
+
+                return new TopListIndexStatusResponse
+                {
+                    Success = true,
+                    Indexed = items.Count,
+                    Identified = items.Count(i => !string.IsNullOrEmpty(i.GetProviderId("Imdb")))
+                };
+            }
+            catch (Exception ex)
+            {
+                return new TopListIndexStatusResponse { Success = false, Message = ex.Message };
+            }
+        }
+
         public object Post(PrepareTopListFolderRequest request)
         {
             try
@@ -1246,14 +1324,18 @@ public class HomeScreenCompanionService : IService
                 foreach (var f in Directory.GetFiles(folderPath, "*.jpg"))
                     File.Delete(f);
 
-                // Write one .strm file per movie that carries this tag
+                // Write one .strm file per movie that carries this tag. Top-list copies are skipped:
+                // one carrying the tag would otherwise become a .strm pointing at a .strm.
+                var topListsFolder = Path.Combine(dataPath, "toplists") + Path.DirectorySeparatorChar;
                 var items = _libraryManager.GetItemList(new InternalItemsQuery
                 {
                     Tags = new[] { request.TagName },
                     IncludeItemTypes = new[] { "Movie" },
                     Recursive = true,
                     IsVirtualItem = false
-                }).ToList();
+                }).Where(i => string.IsNullOrEmpty(i.Path)
+                           || !i.Path.StartsWith(topListsFolder, StringComparison.OrdinalIgnoreCase))
+                  .ToList();
 
                 // Sort by saved rank order from the last task run (preserves external list order)
                 var rankFile = Path.Combine(Plugin.Instance.DataFolderPath, "tag_ranks", sanitized + ".json");
@@ -2176,55 +2258,20 @@ public class HomeScreenCompanionService : IService
 
                 var resolvedLibraryId = tl.HomeSectionLibraryId;
 
-                // Exclude ALL libraries except this top-list's own; use GetUserViews to capture
-                // Live TV's user-view ID (GetVirtualFolders does not include Live TV).
+                // Exclude everything except this top-list's own library. The section is shown to
+                // several users and each one's editor lists their own views (hidden libraries,
+                // channels, Live TV), so collect the views of every selected user.
                 var allLibIds = _libraryManager.GetVirtualFolders()
                     .Where(f => !string.IsNullOrEmpty(f.ItemId))
                     .Select(f => f.ItemId.Trim().ToLowerInvariant())
                     .ToList();
-                var firstUserIdForViews = tl.HomeSectionUserIds?.FirstOrDefault();
-                if (!string.IsNullOrEmpty(firstUserIdForViews))
-                {
-                    try
-                    {
-                        var uid = _userManager.GetInternalId(firstUserIdForViews);
-                        Guid.TryParse(firstUserIdForViews, out var userGuid);
-                        var ifMethod = typeof(IUserViewManager).GetMethod("GetUserViews");
-                        if (ifMethod != null)
-                        {
-                            var queryParams = ifMethod.GetParameters();
-                            object queryArg = null;
-                            if (queryParams.Length > 0)
-                            {
-                                try
-                                {
-                                    queryArg = Activator.CreateInstance(queryParams[0].ParameterType);
-                                    var uidProp = queryParams[0].ParameterType.GetProperty("UserId");
-                                    if (uidProp?.PropertyType == typeof(long))
-                                        uidProp.SetValue(queryArg, uid);
-                                    else
-                                        uidProp?.SetValue(queryArg, userGuid);
-                                }
-                                catch { queryArg = null; }
-                            }
-                            var result = ifMethod.Invoke(_userViewManager, new[] { queryArg });
-                            if (result is System.Collections.IEnumerable views)
-                                foreach (var v in views)
-                                {
-                                    var idProp = v?.GetType().GetProperty("Id");
-                                    if (idProp?.GetValue(v) is Guid vid && vid != Guid.Empty)
-                                        allLibIds.Add(vid.ToString("N").ToLowerInvariant());
-                                }
-                        }
-                    }
-                    catch { }
-                }
-                allLibIds = allLibIds.Distinct().ToList();
-                var ownIdLower = resolvedLibraryId.Trim().ToLowerInvariant();
+                foreach (var viewUserId in tl.HomeSectionUserIds ?? new System.Collections.Generic.List<string>())
+                    allLibIds.AddRange(TopListSyncTask.GetSectionEditorViewIds(_userViewManager, _userManager, viewUserId));
+                var ownIds = TopListSyncTask.OwnLibraryIds(resolvedLibraryId, _libraryManager);
                 var storedExclude = (settingsDict.TryGetValue("_queryExcludeViewIds", out var storedEv) ? storedEv : "")
                     .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
                     .Select(s => s.Trim().ToLowerInvariant()).Where(s => s.Length > 0);
-                var mergedIds = allLibIds.Concat(storedExclude).Where(id => id != ownIdLower).Distinct().ToList();
+                var mergedIds = allLibIds.Concat(storedExclude).Where(id => !ownIds.Contains(id)).Distinct().ToList();
                 var excStr = string.Join(",", mergedIds);
                 settingsDict["_queryExcludeViewIds"] = excStr;
                 settingsDict["ExcludedFolders"] = excStr;
@@ -2473,7 +2520,8 @@ public class HomeScreenCompanionService : IService
                     ExtendedConsoleOutput     = config.ExtendedConsoleOutput,
                     LogMissingItems           = config.LogMissingItems,
                     DryRunMode                = config.DryRunMode,
-                    PreserveTagsOnEmptyResult = config.PreserveTagsOnEmptyResult
+                    PreserveTagsOnEmptyResult = config.PreserveTagsOnEmptyResult,
+                    TopListMirrorCollections  = config.TopListMirrorCollections
                 };
                 file.Sections.Add("Settings");
             }
@@ -2569,6 +2617,7 @@ public class HomeScreenCompanionService : IService
 
                 bool Has(string section) => backup.Sections.Contains(section, StringComparer.OrdinalIgnoreCase);
                 var knownUsers = LoadKnownUserIds();
+                bool mirrorChanged = false;
 
                 if (request.Settings && Has("Settings") && backup.Settings != null)
                 {
@@ -2583,6 +2632,8 @@ public class HomeScreenCompanionService : IService
                     config.LogMissingItems           = s.LogMissingItems;
                     config.DryRunMode                = s.DryRunMode;
                     config.PreserveTagsOnEmptyResult = s.PreserveTagsOnEmptyResult;
+                    mirrorChanged = config.TopListMirrorCollections != s.TopListMirrorCollections;
+                    config.TopListMirrorCollections  = s.TopListMirrorCollections;
                     response.Applied.Add("Settings");
                 }
 
@@ -2744,6 +2795,7 @@ public class HomeScreenCompanionService : IService
                     return Fail(response, "Nothing selected to restore, or the selected sections are not present in the file.");
 
                 plugin.SaveConfiguration();
+                if (mirrorChanged) TopListCollectionMirror.QueueFullSync();
                 response.Success = true;
                 response.Message = $"Restored {response.Applied.Count} section(s).";
                 return response;
@@ -2825,7 +2877,8 @@ public class HomeScreenCompanionService : IService
                 ExtendedConsoleOutput     = legacy.ExtendedConsoleOutput,
                 LogMissingItems           = legacy.LogMissingItems,
                 DryRunMode                = legacy.DryRunMode,
-                PreserveTagsOnEmptyResult = legacy.PreserveTagsOnEmptyResult
+                PreserveTagsOnEmptyResult = legacy.PreserveTagsOnEmptyResult,
+                TopListMirrorCollections  = legacy.TopListMirrorCollections
             };
             result.Sections.Add("Settings");
             result.ApiKeys = new BackupApiKeys

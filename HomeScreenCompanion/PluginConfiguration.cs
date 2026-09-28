@@ -31,6 +31,8 @@ namespace HomeScreenCompanion
         public bool LogMissingItems { get; set; } = false;
         public bool DryRunMode { get; set; } = false;
         public bool PreserveTagsOnEmptyResult { get; set; } = true;
+        // Give top-list copies the same collection memberships as their original movie.
+        public bool TopListMirrorCollections { get; set; } = false;
         public List<TagConfig> Tags { get; set; } = new List<TagConfig>();
         public List<TopListHomeSection> TopLists { get; set; } = new List<TopListHomeSection>();
         public List<SavedMediaInfoFilter> SavedFilters { get; set; } = new List<SavedMediaInfoFilter>();

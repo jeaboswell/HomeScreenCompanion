@@ -30,6 +30,15 @@ namespace HomeScreenCompanion
         public static IApplicationPaths AppPaths { get; private set; } = null!;
         public static new IXmlSerializer XmlSerializer { get; private set; } = null!;
 
+        public override void UpdateConfiguration(BasePluginConfiguration configuration)
+        {
+            var wasMirroring = Configuration?.TopListMirrorCollections ?? false;
+            base.UpdateConfiguration(configuration);
+            // Toggling the collection mirror adds (or removes) memberships for all existing copies.
+            if (Configuration.TopListMirrorCollections != wasMirroring)
+                TopListCollectionMirror.QueueFullSync();
+        }
+
         public IEnumerable<PluginPageInfo> GetPages()
         {
             var assembly = GetType().Assembly;

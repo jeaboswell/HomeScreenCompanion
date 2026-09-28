@@ -185,6 +185,12 @@ namespace HomeScreenCompanion
                     }
                 }
 
+                // Candidates for local matching (MediaInfo filters, AI title fallback) — top-list
+                // copies share genre/year/media info with their original and must never match.
+                // allItems itself still includes them so stale managed tags get cleaned off.
+                var matchableItems = allItems.Where(i => string.IsNullOrEmpty(i.Path)
+                    || !i.Path.StartsWith(topListsFolder, StringComparison.OrdinalIgnoreCase)).ToList();
+
                 int movieCount = allItems.Count(i => i.GetType().Name.Contains("Movie"));
                 int seriesCount = allItems.Count(i => i.GetType().Name.Contains("Series"));
                 int activeGroupTotal = config.Tags.Count(t => t.Active && !string.IsNullOrWhiteSpace(t.Tag));
@@ -745,7 +751,7 @@ namespace HomeScreenCompanion
                             }
                             else
                             {
-                                itemsToScan = allItems;
+                                itemsToScan = matchableItems;
                             }
 
                             foreach (var item in itemsToScan)
@@ -861,7 +867,7 @@ namespace HomeScreenCompanion
                                     else
                                     {
                                         // IMDB ID not found in library — fall back to title+year match
-                                        var titleMatches = FindByTitleAndYear(allItems, aiItem.title, aiItem.year);
+                                        var titleMatches = FindByTitleAndYear(matchableItems, aiItem.title, aiItem.year);
                                         if (titleMatches.Count > 0) { _aiTitleMatched++; _log.Debug($"    {imdbId} not in library — matched '{_aiLabel}' by title"); }
                                         else gs.MissingItems.Add($"{_aiLabel}  {imdbId}");
                                         foreach (var localItem in titleMatches)
@@ -876,7 +882,7 @@ namespace HomeScreenCompanion
                                 else
                                 {
                                     // Fallback: title+year match when AI didn't return an IMDB ID
-                                    var titleMatches = FindByTitleAndYear(allItems, aiItem.title, aiItem.year);
+                                    var titleMatches = FindByTitleAndYear(matchableItems, aiItem.title, aiItem.year);
                                     if (titleMatches.Count > 0) _aiTitleMatched++;
                                     else gs.MissingItems.Add($"{_aiLabel}  (no IMDb id from AI)");
                                     foreach (var localItem in titleMatches)
@@ -1251,7 +1257,8 @@ namespace HomeScreenCompanion
                         }
                         else
                         {
-                            var currentMembers = _libraryManager.GetItemList(new InternalItemsQuery { CollectionIds = new[] { existingColl.InternalId }, Recursive = true, IsVirtualItem = false }).Select(i => i.InternalId).ToHashSet();
+                            // Top-list copies are managed by TopListCollectionMirror — never remove them here.
+                            var currentMembers = _libraryManager.GetItemList(new InternalItemsQuery { CollectionIds = new[] { existingColl.InternalId }, Recursive = true, IsVirtualItem = false }).Where(i => !TopListCollectionMirror.IsTopListItem(i)).Select(i => i.InternalId).ToHashSet();
                             var toAdd = desiredIds.Where(id => !currentMembers.Contains(id)).ToList();
                             var toRemove = currentMembers.Where(id => !desiredIds.Contains(id)).ToList();
                             if (toAdd.Count > 0 && !dryRun)
@@ -1595,6 +1602,10 @@ namespace HomeScreenCompanion
                     imdbLookup[imdb].Add(item);
                 }
             }
+
+            // See Execute: top-list copies never take part in local matching.
+            var matchableItems = allItems.Where(i => string.IsNullOrEmpty(i.Path)
+                || !i.Path.StartsWith(_topListsFolder, StringComparison.OrdinalIgnoreCase)).ToList();
 
             var seriesEpisodeCache = new Dictionary<long, BaseItem>();
             var personCache = new Dictionary<string, HashSet<long>>(StringComparer.OrdinalIgnoreCase);
@@ -1940,7 +1951,7 @@ namespace HomeScreenCompanion
                     }
                     else
                     {
-                        _itemsToScan = allItems;
+                        _itemsToScan = matchableItems;
                     }
                     _listCount = _itemsToScan.Count;
                     foreach (var item in _itemsToScan)
@@ -2036,7 +2047,7 @@ namespace HomeScreenCompanion
                             else
                             {
                                 // IMDB ID not found in library — fall back to title+year match
-                                var titleMatches = FindByTitleAndYear(allItems, aiItem.title, aiItem.year);
+                                var titleMatches = FindByTitleAndYear(matchableItems, aiItem.title, aiItem.year);
                                 if (titleMatches.Count > 0) { _aiTitleMatched++; _log.Debug($"    {imdbId} not in library — matched '{_aiLabel}' by title"); }
                                 else gs.MissingItems.Add($"{_aiLabel}  {imdbId}");
                                 foreach (var localItem in titleMatches)
@@ -2049,7 +2060,7 @@ namespace HomeScreenCompanion
                         }
                         else
                         {
-                            var titleMatches = FindByTitleAndYear(allItems, aiItem.title, aiItem.year);
+                            var titleMatches = FindByTitleAndYear(matchableItems, aiItem.title, aiItem.year);
                             if (titleMatches.Count > 0) _aiTitleMatched++;
                             else gs.MissingItems.Add($"{_aiLabel}  (no IMDb id from AI)");
                             foreach (var localItem in titleMatches)
@@ -2330,7 +2341,8 @@ namespace HomeScreenCompanion
                     }
                     else
                     {
-                        var currentMembers = _libraryManager.GetItemList(new InternalItemsQuery { CollectionIds = new[] { existingColl.InternalId }, Recursive = true, IsVirtualItem = false }).Select(i => i.InternalId).ToHashSet();
+                        // Top-list copies are managed by TopListCollectionMirror — never remove them here.
+                        var currentMembers = _libraryManager.GetItemList(new InternalItemsQuery { CollectionIds = new[] { existingColl.InternalId }, Recursive = true, IsVirtualItem = false }).Where(i => !TopListCollectionMirror.IsTopListItem(i)).Select(i => i.InternalId).ToHashSet();
                         var toAdd = desiredIds.Where(id => !currentMembers.Contains(id)).ToList();
                         var toRemove = currentMembers.Where(id => !desiredIds.Contains(id)).ToList();
                         if (toAdd.Count > 0) await _collectionManager.AddToCollection(existingColl.InternalId, toAdd.ToArray());
@@ -4813,13 +4825,16 @@ namespace HomeScreenCompanion
                     catch { }
                 }
 
+                // Top-list copies are skipped — see PrepareTopListFolderRequest handler.
                 var items = _libraryManager.GetItemList(new InternalItemsQuery
                 {
                     Tags = new[] { tl.TagName },
                     IncludeItemTypes = new[] { "Movie" },
                     Recursive = true,
                     IsVirtualItem = false
-                }).ToList();
+                }).Where(i => string.IsNullOrEmpty(i.Path)
+                           || !i.Path.StartsWith(topListsFolder, StringComparison.OrdinalIgnoreCase))
+                  .ToList();
 
                 var rankFile = Path.Combine(dataPath, "tag_ranks", sanitized + ".json");
                 if (File.Exists(rankFile))

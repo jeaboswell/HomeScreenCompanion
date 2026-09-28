@@ -64,7 +64,7 @@ namespace HomeScreenCompanion
 
         public string Key => "MergeTopListVersionsTask";
         public string Name => "Merge top-list versions with library";
-        public string Description => "Links each top-list .strm item to its corresponding library movie as an alternate version (like 1080p/4K) to prevent UI duplicates. Run this after a library scan has indexed newly added top-list entries.";
+        public string Description => "Links each top-list .strm item to its corresponding library movie as an alternate version (like 1080p/4K) to prevent UI duplicates, and syncs their collection memberships when that option is on. Run this after a library scan has indexed newly added top-list entries.";
         public string Category => "Home Screen Companion";
 
         public IEnumerable<TaskTriggerInfo> GetDefaultTriggers() => Array.Empty<TaskTriggerInfo>();
@@ -79,8 +79,12 @@ namespace HomeScreenCompanion
             {
                 _log.Info($"» Merging top-list versions with library  ·  {startTime:yyyy-MM-dd HH:mm}");
                 var merged = MergeAll(_libraryManager, _providerManager, _fileSystem, cancellationToken);
+                // Bring collection memberships of all copies in line with the setting (mirror or clear).
+                var collChanges = TopListCollectionMirror.SyncAll(cancellationToken).GetAwaiter().GetResult();
                 LastRunStatus = $"Done — {merged} item(s) linked.";
                 _log.Ok($"{RunLog.Plural(merged, "top-list item")} linked to library movies  ·  {RunLog.Elapsed(DateTime.Now - startTime)}");
+                if (collChanges > 0)
+                    _log.Ok($"{RunLog.Plural(collChanges, "collection membership")} updated on top-list items");
             }
             catch (Exception ex)
             {

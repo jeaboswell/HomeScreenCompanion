@@ -76,6 +76,7 @@ namespace HomeScreenCompanion
     }
 
     [MediaBrowser.Model.Services.Route("/HomeScreenCompanion/Hsc/UserSections", "GET")]
+    [MediaBrowser.Controller.Net.Authenticated(Roles = "Admin")]
     public class HscGetUserSectionsRequest : MediaBrowser.Model.Services.IReturn<HscUserSectionsResponse>
     {
         public string UserId { get; set; } = "";
@@ -87,6 +88,7 @@ namespace HomeScreenCompanion
     }
 
     [MediaBrowser.Model.Services.Route("/HomeScreenCompanion/Hsc/UserSections", "POST")]
+    [MediaBrowser.Controller.Net.Authenticated(Roles = "Admin")]
     public class HscSaveUserSectionsRequest : MediaBrowser.Model.Services.IReturn<HscSaveUserSectionsResponse>
     {
         public string UserId { get; set; } = "";
@@ -100,9 +102,11 @@ namespace HomeScreenCompanion
     }
 
     [MediaBrowser.Model.Services.Route("/HomeScreenCompanion/Hsc/SectionSchema", "GET")]
+    [MediaBrowser.Controller.Net.Authenticated(Roles = "Admin")]
     public class HscGetSectionSchemaRequest : MediaBrowser.Model.Services.IReturn<HscSectionSchemaResponse> { }
 
     [MediaBrowser.Model.Services.Route("/HomeScreenCompanion/Hsc/DebugMethods", "GET")]
+    [MediaBrowser.Controller.Net.Authenticated(Roles = "Admin")]
     public class HscDebugMethodsRequest : MediaBrowser.Model.Services.IReturn<string> { }
 
     public class HscSectionSchemaResponse
@@ -185,6 +189,7 @@ namespace HomeScreenCompanion
     }
 
     [MediaBrowser.Model.Services.Route("/HomeScreenCompanion/Hsc/ApplyTagHomeSections", "POST")]
+    [MediaBrowser.Controller.Net.Authenticated(Roles = "Admin")]
     public class HscApplyTagHomeSectionsRequest : MediaBrowser.Model.Services.IReturn<HscApplyTagHomeSectionsResponse>
     {
         public string TagName { get; set; } = "";
@@ -198,6 +203,7 @@ namespace HomeScreenCompanion
     }
 
     [MediaBrowser.Model.Services.Route("/HomeScreenCompanion/TestAiSource", "POST")]
+    [MediaBrowser.Controller.Net.Authenticated(Roles = "Admin")]
     public class TestAiSourceRequest : MediaBrowser.Model.Services.IReturn<TestAiSourceResponse>
     {
         public string Provider { get; set; } = "OpenAI";

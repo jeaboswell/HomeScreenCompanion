@@ -1218,20 +1218,14 @@
                         <i class="md-icon settings-panel-chevron" style="margin-left: auto; transition: transform 0.2s;">expand_more</i>
                     </div>
                     <div class="advanced-body settings-panel-body" style="display:none;">
+                        <div style="font-size: 0.75em; font-weight: 700; text-transform: uppercase; letter-spacing: 1.4px; opacity: 0.45; margin-top: 4px; margin-bottom: 8px;">Logging &amp; Troubleshooting</div>
+
                         <div class="checkboxContainer checkboxContainer-withDescription">
                             <label>
                                 <input is="emby-checkbox" type="checkbox" id="chkExtendedConsoleOutput" />
-                                <span>Extended log (troubleshooting)</span>
+                                <span>Extended log</span>
                             </label>
                             <div class="fieldDescription">Adds source details, per-item changes, timings and error details to the log. Useful when something goes wrong or when reporting a bug.</div>
-                        </div>
-
-                        <div class="checkboxContainer checkboxContainer-withDescription" style="margin-top: 15px;">
-                            <label>
-                                <input is="emby-checkbox" type="checkbox" id="chkLogMissingItems" />
-                                <span>Log missing movies and shows</span>
-                            </label>
-                            <div class="fieldDescription">Lists, per group, the titles from your External and AI lists that are not in your library — handy for finding what to add next.</div>
                         </div>
 
                         <div class="checkboxContainer checkboxContainer-withDescription" style="margin-top: 15px;">
@@ -1242,12 +1236,32 @@
                             <div class="fieldDescription">Simulate process without modifying database.</div>
                         </div>
 
-                        <div class="checkboxContainer checkboxContainer-withDescription" style="margin-top: 15px;">
+                        <div style="font-size: 0.75em; font-weight: 700; text-transform: uppercase; letter-spacing: 1.4px; opacity: 0.45; margin-top: 24px; margin-bottom: 8px;">Tags &amp; Collections</div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
                             <label>
                                 <input is="emby-checkbox" type="checkbox" id="chkPreserveTagsOnEmptyResult" />
                                 <span>Preserve tags and collections on empty result</span>
                             </label>
                             <div class="fieldDescription">If an External or AI source returns zero items, keep existing tags and collection members instead of removing them.</div>
+                        </div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription" style="margin-top: 15px;">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="chkLogMissingItems" />
+                                <span>Log missing movies and shows</span>
+                            </label>
+                            <div class="fieldDescription">Lists, per group, the titles from your External and AI lists that are not in your library — handy for finding what to add next.</div>
+                        </div>
+
+                        <div style="font-size: 0.75em; font-weight: 700; text-transform: uppercase; letter-spacing: 1.4px; opacity: 0.45; margin-top: 24px; margin-bottom: 8px;">Top-lists</div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="chkTopListMirrorCollections" />
+                                <span>Show collections on top-list items</span>
+                            </label>
+                            <div class="fieldDescription">Adds each top-list movie to the same collections as the original, so "Included in &lt;collection&gt;" also shows when a movie is opened from a top-list. Note: depending on the sort order, a collection may then show the top-list version with its rank-badge poster.</div>
                         </div>
                     </div>
                 </div>

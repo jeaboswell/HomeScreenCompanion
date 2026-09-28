@@ -3400,6 +3400,7 @@ define(['emby-input', 'emby-button', 'emby-select', 'emby-checkbox'], function (
             LogMissingItems: view.querySelector('#chkLogMissingItems').checked,
             DryRunMode: view.querySelector('#chkDryRunMode').checked,
             PreserveTagsOnEmptyResult: view.querySelector('#chkPreserveTagsOnEmptyResult').checked,
+            TopListMirrorCollections: view.querySelector('#chkTopListMirrorCollections').checked,
             Tags: flatTags,
             SavedFilters: savedFilters,
             HomeSyncEnabled: hscEnabled ? hscEnabled.checked : (lastHscConfig.HomeSyncEnabled || false),
@@ -4521,9 +4522,24 @@ define(['emby-input', 'emby-button', 'emby-select', 'emby-checkbox'], function (
                 })
             }).catch(function () {})
             .then(function () {
-                return fetch(window.ApiClient.getUrl('Library/VirtualFolders'), {
-                    headers: { 'X-MediaBrowser-Token': tok }
-                }).then(function (r) { return r.json(); });
+                // Emby may register the new library asynchronously — re-fetch a few times until
+                // it shows up, otherwise the library id stays 'auto' and nothing gets scanned.
+                function fetchUntilRegistered(attempt) {
+                    return fetch(window.ApiClient.getUrl('Library/VirtualFolders'), {
+                        headers: { 'X-MediaBrowser-Token': tok }
+                    }).then(function (r) { return r.json(); })
+                    .then(function (folders) {
+                        var found = (folders || []).some(function (f) {
+                            return f.ItemId && (f.Locations || []).some(function (loc) {
+                                return normLibPath(loc) === targetPath;
+                            });
+                        });
+                        if (found || attempt >= 10) return folders;
+                        return new Promise(function (res) { setTimeout(res, 1000); })
+                            .then(function () { return fetchUntilRegistered(attempt + 1); });
+                    });
+                }
+                return fetchUntilRegistered(1);
             })
             .then(function (newFolders) {
                 return { folders: newFolders, preCreationIds: preCreationIds };
@@ -4553,20 +4569,24 @@ define(['emby-input', 'emby-button', 'emby-select', 'emby-checkbox'], function (
                 if (diffMatch) newLibId = diffMatch.ItemId;
             }
 
-            var userId = selectedUserIds[0];
-            var viewsPromise = userId
-                ? fetch(window.ApiClient.getUrl('Users/' + userId + '/Views'), { headers: { 'X-MediaBrowser-Token': tok } })
+            // Same view list Emby's section editor offers under "Libraries" (hidden libraries and
+            // channels included), for every selected user — anything missing stays ticked.
+            var viewsPromise = Promise.all(selectedUserIds.map(function (userId) {
+                return fetch(window.ApiClient.getUrl('Users/' + userId + '/Views', { IncludeHidden: true, AllowDynamicChildren: false }), { headers: { 'X-MediaBrowser-Token': tok } })
                     .then(function (r) { return r.json(); })
-                    .catch(function () { return { Items: [] }; })
-                : Promise.resolve({ Items: [] });
+                    .catch(function () { return { Items: [] }; });
+            }));
 
-            return viewsPromise.then(function (viewsResult) {
+            return viewsPromise.then(function (viewsResults) {
                 var allViewIds = new Set();
-                (folders || []).forEach(function (f) { if (f.ItemId) allViewIds.add(f.ItemId); });
-                ((viewsResult && viewsResult.Items) || []).forEach(function (v) { if (v.Id) allViewIds.add(v.Id); });
-                var excludedViewIds = Array.from(allViewIds)
-                    .filter(function (id) { return !newLibId || id !== newLibId; })
-                    .join(',');
+                (folders || []).forEach(function (f) { if (f.ItemId && f.ItemId !== newLibId) allViewIds.add(f.ItemId); });
+                viewsResults.forEach(function (viewsResult) {
+                    ((viewsResult && viewsResult.Items) || []).forEach(function (v) {
+                        if (!v.Id || (newLibId && (v.Id === newLibId || v.Guid === newLibId))) return;
+                        allViewIds.add(v.Id);
+                    });
+                });
+                var excludedViewIds = Array.from(allViewIds).join(',');
                 return { prepareResult: prepareResult, libraryItemId: newLibId, excludedViewIds: excludedViewIds };
             });
         })
@@ -4637,16 +4657,52 @@ define(['emby-input', 'emby-button', 'emby-select', 'emby-checkbox'], function (
             });
         })
         .then(function (ctx2) {
-            // Step 6: Scan the newly created library only
-            if (ctx2.libraryItemId) {
-                saveBtn.innerHTML = 'Scanning library <span class="tc-dot-loader"><span></span><span></span><span></span></span>';
-                var tok6 = window.ApiClient.accessToken ? window.ApiClient.accessToken() : '';
-                return fetch(window.ApiClient.getUrl('Items/' + ctx2.libraryItemId + '/Refresh') + '?Recursive=true&MetadataRefreshMode=Default&ImageRefreshMode=Default', {
+            // Step 6: Scan the new library so Emby indexes and identifies the .strm files.
+            // The library is created with RefreshLibrary=false and the files were written before
+            // it existed, so without this scan the library (and the home section) stays empty.
+            saveBtn.innerHTML = 'Scanning library <span class="tc-dot-loader"><span></span><span></span><span></span></span>';
+            var tok6 = window.ApiClient.accessToken ? window.ApiClient.accessToken() : '';
+            var scanOwnLibrary = ctx2.libraryItemId
+                ? fetch(window.ApiClient.getUrl('Items/' + ctx2.libraryItemId + '/Refresh') + '?Recursive=true&MetadataRefreshMode=Default&ImageRefreshMode=Default', {
                     method: 'POST',
                     headers: { 'X-MediaBrowser-Token': tok6 }
-                }).catch(function () {}).then(function () { return ctx2.prepareResult; });
-            }
-            return ctx2.prepareResult;
+                }).then(function (r) { return r.ok; }).catch(function () { return false; })
+                : Promise.resolve(false);
+            return scanOwnLibrary.then(function (ok) {
+                if (ok) return;
+                // Fallback: full library scan (also picks up the new library's files).
+                console.warn('[HSC] Top-list library refresh failed — falling back to a full library scan.');
+                return fetch(window.ApiClient.getUrl('Library/Refresh'), {
+                    method: 'POST',
+                    headers: { 'X-MediaBrowser-Token': tok6 }
+                }).catch(function () {});
+            })
+            .then(function () {
+                // Step 6b: Wait until the scan has indexed + identified the files, so the
+                // final section sync runs against a populated library.
+                var expected = ctx2.prepareResult.FilesCreated || 0;
+                if (!expected) return;
+                var deadline = Date.now() + 120000;
+                function poll() {
+                    return fetch(window.ApiClient.getUrl('HomeScreenCompanion/TopList/IndexStatus', { FolderPath: ctx2.prepareResult.FolderPath }), {
+                        headers: { 'X-MediaBrowser-Token': tok6 }
+                    })
+                    .then(function (r) { return r.json(); })
+                    .catch(function () { return null; })
+                    .then(function (st) {
+                        if (!st || !st.Success) return;
+                        saveBtn.innerHTML = 'Identifying movies (' + Math.min(st.Identified, expected) + '/' + expected + ') <span class="tc-dot-loader"><span></span><span></span><span></span></span>';
+                        if (st.Indexed >= expected && st.Identified >= st.Indexed) return;
+                        if (Date.now() > deadline) {
+                            console.warn('[HSC] Top-list scan still running after timeout — ' + st.Indexed + '/' + expected + ' indexed, ' + st.Identified + ' identified.');
+                            return;
+                        }
+                        return new Promise(function (res) { setTimeout(res, 2000); }).then(poll);
+                    });
+                }
+                return poll();
+            })
+            .then(function () { return ctx2.prepareResult; });
         })
         .then(function (prepareResult) {
             // NOTE: Linking each .strm as an alternate version of its original movie AND probing it
@@ -7112,6 +7168,7 @@ define(['emby-input', 'emby-button', 'emby-select', 'emby-checkbox'], function (
                 view.querySelector('#chkLogMissingItems').checked = config.LogMissingItems || false;
                 view.querySelector('#chkDryRunMode').checked = config.DryRunMode || false;
                 view.querySelector('#chkPreserveTagsOnEmptyResult').checked = config.PreserveTagsOnEmptyResult || false;
+                view.querySelector('#chkTopListMirrorCollections').checked = config.TopListMirrorCollections || false;
                 if (view.querySelector('#txtSearchTags')) {
                     view.querySelector('#txtSearchTags').value = '';
                     view.querySelector('#btnClearSearch').style.display = 'none';

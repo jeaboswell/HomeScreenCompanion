@@ -1,4 +1,5 @@
-﻿using MediaBrowser.Controller.Entities;
+﻿using MediaBrowser.Controller.Collections;
+using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Plugins;
 using MediaBrowser.Controller.Providers;
@@ -21,17 +22,22 @@ namespace HomeScreenCompanion
         private readonly IJsonSerializer _jsonSerializer;
         private readonly IProviderManager _providerManager;
         private readonly IFileSystem _fileSystem;
+        private readonly ICollectionManager _collectionManager;
 
         private readonly object _strmLock = new object();
-        private readonly HashSet<Guid> _processedStrmIds = new HashSet<Guid>();
+        // Keyed by InternalId, not Id: Emby derives the Guid from the path, so a top-list entry that
+        // is deleted and re-created at the same path (list rebuilt / re-created under the same name)
+        // keeps its Guid but gets a new InternalId — and must be linked again.
+        private readonly HashSet<long> _processedStrmIds = new HashSet<long>();
 
-        public ServerEntryPoint(ILibraryManager libraryManager, ILogManager logManager, IJsonSerializer jsonSerializer, IProviderManager providerManager, IFileSystem fileSystem)
+        public ServerEntryPoint(ILibraryManager libraryManager, ILogManager logManager, IJsonSerializer jsonSerializer, IProviderManager providerManager, IFileSystem fileSystem, ICollectionManager collectionManager)
         {
             _libraryManager = libraryManager;
             _logger = logManager.GetLogger("HomeScreenCompanion_RealTime");
             _jsonSerializer = jsonSerializer;
             _providerManager = providerManager;
             _fileSystem = fileSystem;
+            _collectionManager = collectionManager;
         }
 
         public void Run()
@@ -39,10 +45,23 @@ namespace HomeScreenCompanion
             if (Plugin.Instance == null) return;
             RunAutoMigration();
             TagCacheManager.Instance.Initialize(Plugin.Instance.DataFolderPath, _jsonSerializer);
+            TopListCollectionMirror.Initialize(_libraryManager, _collectionManager, _logger);
 
             _libraryManager.ItemAdded += OnItemChanged;
             _libraryManager.ItemUpdated += OnItemChanged;
+            _collectionManager.CollectionCreated += OnCollectionCreated;
+            _collectionManager.ItemsAddedToCollection += OnItemsAddedToCollection;
+            _collectionManager.ItemsRemovedFromCollection += OnItemsRemovedFromCollection;
         }
+
+        private void OnCollectionCreated(object sender, CollectionCreatedEventArgs e) =>
+            TopListCollectionMirror.OnCollectionChanged(e.Collection, e.Options?.ItemIdList);
+
+        private void OnItemsAddedToCollection(object sender, CollectionModifiedEventArgs e) =>
+            TopListCollectionMirror.OnCollectionChanged(e.Collection, e.ItemsChanged);
+
+        private void OnItemsRemovedFromCollection(object sender, CollectionModifiedEventArgs e) =>
+            TopListCollectionMirror.OnCollectionChanged(e.Collection, e.ItemsChanged);
 
         private void RunAutoMigration()
         {
@@ -178,7 +197,7 @@ namespace HomeScreenCompanion
                 // Process each .strm item once (guards against re-entrancy from our own MergeItems/probe events).
                 lock (_strmLock)
                 {
-                    if (!_processedStrmIds.Add(item.Id)) return;
+                    if (!_processedStrmIds.Add(item.InternalId)) return;
                 }
 
                 var itemId   = item.Id;
@@ -188,7 +207,7 @@ namespace HomeScreenCompanion
                 // synchronously during a library scan, so calling MergeItems here directly would
                 // re-enter the library mid-scan and can hang. A background task keeps this a true
                 // "finishing touches in the background" operation.
-                Task.Run(() =>
+                Task.Run(async () =>
                 {
                     try
                     {
@@ -197,21 +216,28 @@ namespace HomeScreenCompanion
 
                         var topListsFolder = Path.Combine(Plugin.Instance.DataFolderPath, "toplists") + Path.DirectorySeparatorChar;
 
-                        // Find the original (non-top-list) movie that shares this IMDb id.
-                        var primary = _libraryManager.GetItemList(new InternalItemsQuery
+                        // Find the original (non-top-list) movies that share this IMDb id — several
+                        // when versions are separate items; the first is the merge target.
+                        var originals = _libraryManager.GetItemList(new InternalItemsQuery
                         {
                             IncludeItemTypes = new[] { "Movie" },
                             Recursive = true,
                             IsVirtualItem = false
-                        }).FirstOrDefault(m => m.Id != itemId
+                        }).Where(m => m.Id != itemId
                             && !string.IsNullOrEmpty(m.Path)
                             && !m.Path.StartsWith(topListsFolder, StringComparison.OrdinalIgnoreCase)
-                            && string.Equals(m.GetProviderId("Imdb"), imdb, StringComparison.OrdinalIgnoreCase));
+                            && string.Equals(m.GetProviderId("Imdb"), imdb, StringComparison.OrdinalIgnoreCase))
+                          .ToList();
 
-                        if (primary != null)
+                        if (originals.Count > 0)
                         {
+                            var primary = originals[0];
                             try { _libraryManager.MergeItems(new[] { primary, current }); }
                             catch (Exception ex) { _logger.Warn("[TopList] Merge failed for '" + itemName + "': " + ex.Message); }
+
+                            // Optional: same collection memberships as the originals.
+                            if (TopListCollectionMirror.Enabled)
+                                await TopListCollectionMirror.SyncCopy(_libraryManager.GetItemById(itemId) ?? current, originals);
                         }
 
                         // Idempotent — skips if the item already has a runtime.
@@ -234,6 +260,9 @@ namespace HomeScreenCompanion
         {
             _libraryManager.ItemAdded -= OnItemChanged;
             _libraryManager.ItemUpdated -= OnItemChanged;
+            _collectionManager.CollectionCreated -= OnCollectionCreated;
+            _collectionManager.ItemsAddedToCollection -= OnItemsAddedToCollection;
+            _collectionManager.ItemsRemovedFromCollection -= OnItemsRemovedFromCollection;
         }
     }
 }

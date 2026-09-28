@@ -75,6 +75,94 @@ namespace HomeScreenCompanion
             return userId;
         }
 
+        // The ids of every entry Emby's own section editor lists under "Libraries" for this user.
+        // An items-section has no "include only" field — the selection is stored as ExcludedFolders
+        // (every view NOT ticked) — so a view missing here stays ticked. The editor loads
+        // Users/{id}/Views?IncludeHidden=true&AllowDynamicChildren=false, which also contains
+        // libraries the user hid from My Media and channels; mirror that exactly. Both the GUID
+        // and the internal id of each view are returned so either form matches.
+        internal static List<string> GetSectionEditorViewIds(IUserViewManager userViewManager, IUserManager userManager, string userId)
+        {
+            var ids = new List<string>();
+            try
+            {
+                var uid = userManager.GetInternalId(userId);
+                Guid.TryParse(userId, out var userGuid);
+                // Reflect through the interface type to handle explicit interface implementations.
+                var ifMethod = typeof(IUserViewManager).GetMethod("GetUserViews");
+                if (ifMethod == null) return ids;
+                var queryParams = ifMethod.GetParameters();
+                object queryArg = null;
+                if (queryParams.Length > 0)
+                {
+                    try
+                    {
+                        var qt = queryParams[0].ParameterType;
+                        queryArg = Activator.CreateInstance(qt);
+                        var uidProp = qt.GetProperty("UserId");
+                        if (uidProp?.PropertyType == typeof(long))
+                            uidProp.SetValue(queryArg, uid);
+                        else
+                            uidProp?.SetValue(queryArg, userGuid);
+                        SetBool(qt, queryArg, "IncludeHidden", true);
+                        SetBool(qt, queryArg, "AllowDynamicChildren", false);
+                        SetBool(qt, queryArg, "IncludeExternalContent", true);
+                    }
+                    catch { queryArg = null; }
+                }
+                var result = ifMethod.Invoke(userViewManager, new[] { queryArg });
+                if (result is System.Collections.IEnumerable views)
+                    foreach (var v in views)
+                    {
+                        if (v is BaseItem bi)
+                        {
+                            if (bi.Id != Guid.Empty) ids.Add(bi.Id.ToString("N"));
+                            if (bi.InternalId > 0) ids.Add(bi.InternalId.ToString());
+                            continue;
+                        }
+                        var idProp = v?.GetType().GetProperty("Id");
+                        if (idProp?.GetValue(v) is Guid vid && vid != Guid.Empty)
+                            ids.Add(vid.ToString("N"));
+                    }
+            }
+            catch { }
+            return ids.Select(s => s.ToLowerInvariant()).Distinct().ToList();
+        }
+
+        private static void SetBool(Type t, object target, string name, bool value)
+        {
+            var p = t.GetProperty(name);
+            if (p == null || !p.CanWrite) return;
+            if (p.PropertyType == typeof(bool) || p.PropertyType == typeof(bool?))
+                p.SetValue(target, value);
+        }
+
+        // All id forms of a top-list's own library (as stored, GUID, internal id), lowercase, so
+        // it is never put on its own exclusion list whichever form a view list reports.
+        internal static HashSet<string> OwnLibraryIds(string libId, ILibraryManager libraryManager)
+        {
+            var own = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (string.IsNullOrWhiteSpace(libId)) return own;
+            var raw = libId.Trim().ToLowerInvariant();
+            own.Add(raw);
+            own.Add(raw.Replace("-", ""));
+            try
+            {
+                BaseItem lib = null;
+                if (long.TryParse(raw, out var internalId))
+                    lib = libraryManager.GetItemById(internalId);
+                else if (Guid.TryParse(raw, out var g))
+                    lib = libraryManager.GetItemById(g);
+                if (lib != null)
+                {
+                    own.Add(lib.Id.ToString("N"));
+                    own.Add(lib.InternalId.ToString());
+                }
+            }
+            catch { }
+            return own;
+        }
+
         internal static (int updated, string message) SyncAll(
             ILibraryManager libraryManager,
             IUserViewManager userViewManager,
@@ -124,7 +212,7 @@ namespace HomeScreenCompanion
                 if (string.IsNullOrEmpty(tl.HomeSectionLibraryId) || tl.HomeSectionLibraryId == "auto") { _log.Skip($"Top-list '{tlName}': skipped — no library has been created for it yet"); continue; }
                 int tlUpdated = 0, tlRemoved = 0;
 
-                var ownId = tl.HomeSectionLibraryId.Trim().ToLowerInvariant();
+                var ownIds = OwnLibraryIds(tl.HomeSectionLibraryId, libraryManager);
                 var safeTag = new string((tl.TagName ?? "").Select(c => char.IsLetterOrDigit(c) ? c : '_').ToArray());
                 var sectionMarker = "hsc__tl__" + safeTag;
 
@@ -159,7 +247,6 @@ namespace HomeScreenCompanion
                     if (string.IsNullOrEmpty(tracking.UserId) || string.IsNullOrEmpty(tracking.SectionId)) continue;
                     try
                     {
-                        Guid.TryParse(tracking.UserId, out var userGuid);
                         var uid = userManager.GetInternalId(tracking.UserId);
                         var sections = userManager.GetHomeSections(uid, cancellationToken)?.Sections
                             ?? Array.Empty<ContentSection>();
@@ -167,40 +254,9 @@ namespace HomeScreenCompanion
                         var owned = sections.FirstOrDefault(s => s.Id == tracking.SectionId);
                         if (owned == null) continue;
 
-                        // Get ALL views for this user (includes Live TV) via IUserViewManager.
-                        // Reflect through the interface type to handle explicit interface implementations.
-                        var allViewIds = new List<string>();
-                        try
-                        {
-                            var ifMethod = typeof(IUserViewManager).GetMethod("GetUserViews");
-                            if (ifMethod != null)
-                            {
-                                var queryParams = ifMethod.GetParameters();
-                                object queryArg = null;
-                                if (queryParams.Length > 0)
-                                {
-                                    try
-                                    {
-                                        queryArg = Activator.CreateInstance(queryParams[0].ParameterType);
-                                        var uidProp = queryParams[0].ParameterType.GetProperty("UserId");
-                                        if (uidProp?.PropertyType == typeof(long))
-                                            uidProp.SetValue(queryArg, uid);
-                                        else
-                                            uidProp?.SetValue(queryArg, userGuid);
-                                    }
-                                    catch { queryArg = null; }
-                                }
-                                var result = ifMethod.Invoke(userViewManager, new[] { queryArg });
-                                if (result is System.Collections.IEnumerable views)
-                                    foreach (var v in views)
-                                    {
-                                        var idProp = v?.GetType().GetProperty("Id");
-                                        if (idProp?.GetValue(v) is Guid vid && vid != Guid.Empty)
-                                            allViewIds.Add(vid.ToString("N").ToLowerInvariant());
-                                    }
-                            }
-                        }
-                        catch { }
+                        // Every view this user's section editor lists (hidden libraries, channels
+                        // and Live TV included).
+                        var allViewIds = GetSectionEditorViewIds(userViewManager, userManager, tracking.UserId);
 
                         // Always also include virtual folder IDs (ensures regular libraries are covered)
                         foreach (var f in libraryManager.GetVirtualFolders())
@@ -231,9 +287,10 @@ namespace HomeScreenCompanion
                         var storedExclude = (settingsDict.TryGetValue("_queryExcludeViewIds", out var storedEv) ? storedEv : "")
                             .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
                             .Select(s => s.Trim().ToLowerInvariant()).Where(s => s.Length > 0);
-                        var mergedExcludeIds = allViewIds.Where(id => id != ownId)
-                            .Concat(storedExclude.Where(id => id != ownId))
-                            .Concat(allTlLibIds.Where(id => id != ownId))
+                        var mergedExcludeIds = allViewIds
+                            .Concat(storedExclude)
+                            .Concat(allTlLibIds)
+                            .Where(id => !ownIds.Contains(id))
                             .Distinct().ToList();
                         var excludeStr = string.Join(",", mergedExcludeIds);
 
