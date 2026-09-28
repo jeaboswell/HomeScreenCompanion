@@ -73,7 +73,7 @@ Ever get frustrated trying to give all your users the same great home screen exp
 With **Home Screen Sync**, you choose one user as the "Master" and copy their entire home screen layout to any (or all) other users. You can even set it to sync automatically in the background!
 
 ### Continue watching bump
-This is a workaround to highlight for the user that a new episode/season has been added. For example, if the user have watched all episode of a show up until s03e09 (season finale). It might then take a year or two before s04e01 is released, and the show will get buried way down in the continue watched, This function manipulates the "LastPlayedDate" for s03e09 to look like the user just played it.
+This is a workaround to highlight for the user that a new episode/season has been added. For example, if the user have watched all episode of a show up until s03e10 (season finale). It might then take a year or two before s04e01 is released, and the show will get buried way down in the continue watched, This function manipulates the "LastPlayedDate" for s03e10 to look like the user just played it.
 In this way s04e01 will be placed as the first item in the continue watching row.
 This bump will only happen once, and if the user doesn't watch the show, it will gradually move down the continue watching list.
 
