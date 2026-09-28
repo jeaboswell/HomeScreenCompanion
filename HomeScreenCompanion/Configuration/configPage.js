@@ -903,7 +903,9 @@ define(['emby-input', 'emby-button', 'emby-select', 'emby-checkbox'], function (
             var mapped = MI_CRITERION_MAP[crit];
             return mapped ? { prop: mapped.prop, op: '', val: mapped.val, userId: '', not: not } : { prop: '', op: '', val: crit, userId: '', not: not };
         }
-        if (parts.length === 2) return { prop: parts[0], op: '', val: parts[1], userId: '', not: not };
+        // Legacy "Tag:X" (no operator) is evaluated server-side as contains. Keep it explicit so
+        // the exact default below doesn't silently turn it into exact on the next save.
+        if (parts.length === 2) return { prop: parts[0], op: parts[0] === 'Tag' ? 'contains' : '', val: parts[1], userId: '', not: not };
         if (parts.length === 3) return { prop: parts[0], op: parts[1], val: parts[2], userId: '', not: not };
         if (parts.length === 4) return { prop: parts[0], userId: parts[1], op: parts[2], val: parts[3], not: not };
         return { prop: 'Resolution', op: '', val: '', userId: '', not: false };
@@ -931,7 +933,7 @@ define(['emby-input', 'emby-button', 'emby-select', 'emby-checkbox'], function (
     var MI_USER_PROPS = ['IsPlayed', 'LastPlayed', 'PlayCount'];
     var MI_TEXT_MATCH_PROPS = ['Tag', 'Title', 'EpisodeTitle', 'Overview', 'Studio', 'Genre', 'Actor', 'Director', 'Writer', 'ContentRating', 'AudioLanguage', 'Artist', 'Album', 'FolderPath', 'Country'];
     var MI_TEXT_MATCH_DEFAULT = {
-        Title: 'contains', EpisodeTitle: 'contains', Overview: 'contains', Studio: 'contains', Genre: 'contains', Tag: 'contains',
+        Title: 'contains', EpisodeTitle: 'contains', Overview: 'contains', Studio: 'contains', Genre: 'contains', Tag: 'exact',
         Actor: 'exact', Director: 'exact', Writer: 'exact', Artist: 'contains', Album: 'contains',
         ContentRating: 'exact', AudioLanguage: 'exact', FolderPath: 'contains', Country: 'contains'
     };

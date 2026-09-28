@@ -147,6 +147,7 @@ namespace HomeScreenCompanion
 
                 var config = Plugin.Instance?.Configuration;
                 if (config == null) return;
+                _writtenTags = BuildWrittenTags(config);
 
                 bool debug = config.ExtendedConsoleOutput;
                 bool dryRun = config.DryRunMode;
@@ -984,8 +985,14 @@ namespace HomeScreenCompanion
                                     desiredTagsMap[localItem.Id] = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                                 desiredTagsMap[localItem.Id].Add(tagName);
 
+                                // The real-time tag cache is keyed by IMDb id, so only list sources belong in
+                                // it (External is cached from the list itself above). MediaInfo and local
+                                // collection/playlist results are per item: caching them would re-tag every
+                                // other item with the same IMDb id (other versions, top-list copies) on its
+                                // next update, straight after this sync removed the tag.
                                 var imdb = localItem.GetProviderId("Imdb");
-                                if (!string.IsNullOrEmpty(imdb) && tagConfig.SourceType != "External")
+                                bool listSource = string.IsNullOrEmpty(tagConfig.SourceType) || tagConfig.SourceType == "AI";
+                                if (!string.IsNullOrEmpty(imdb) && listSource)
                                     TagCacheManager.Instance.AddToCache($"imdb_{imdb}", tagName);
                             }
                         }
@@ -1517,6 +1524,7 @@ namespace HomeScreenCompanion
         {
             var config = Plugin.Instance?.Configuration;
             if (config == null) return (false, "Config not found");
+            _writtenTags = BuildWrittenTags(config);
 
             var tagConfig = config.Tags.FirstOrDefault(t =>
                 string.Equals(t.Name, entryName, StringComparison.OrdinalIgnoreCase) ||
@@ -3067,6 +3075,17 @@ namespace HomeScreenCompanion
 
         // Returns true when this entry is a LocalCollection home section with media type = Collections.
         // Used to decide that only the BoxSet itself (not its items) should receive the tag.
+        // Tags this plugin writes onto items (some entry of the group has tagging on). A group's
+        // Tag: criteria must not see its own output tag, or an item that got it once keeps
+        // matching its own rule forever (e.g. tag "zzrow-musicals" + Tag:contains:Musicals).
+        private HashSet<string> _writtenTags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        private HashSet<string> BuildWrittenTags(PluginConfiguration config) => new HashSet<string>(
+            (config.Tags ?? new List<TagConfig>())
+                .Where(t => !string.IsNullOrWhiteSpace(t.Tag) && t.EnableTag && !t.OnlyCollection && !IsBoxSetHomeSectionEntry(t))
+                .Select(t => t.Tag.Trim()),
+            StringComparer.OrdinalIgnoreCase);
+
         private bool IsBoxSetHomeSectionEntry(TagConfig tc)
         {
             if (!tc.EnableHomeSection || tc.SourceType != "LocalCollection" || string.IsNullOrEmpty(tc.LocalSourceId)) return false;
@@ -3489,15 +3508,29 @@ namespace HomeScreenCompanion
             return section;
         }
 
-        private bool IsScheduleActive(List<DateInterval> intervals)
+        private bool IsScheduleActive(List<DateInterval> intervals) => IsScheduleActive(intervals, DateTime.Now);
+
+        internal static bool IsScheduleActive(List<DateInterval> intervals, DateTime now)
         {
             if (intervals == null || intervals.Count == 0) return true;
-            var now = DateTime.Now;
             foreach (var interval in intervals)
             {
                 bool match = false;
                 if (interval.Type == "Weekly") { if (!string.IsNullOrEmpty(interval.DayOfWeek) && interval.DayOfWeek.IndexOf(now.DayOfWeek.ToString(), StringComparison.OrdinalIgnoreCase) >= 0) match = true; }
-                else if (interval.Type == "EveryYear") { if (interval.Start.HasValue && interval.End.HasValue) { var sDay = Math.Min(interval.Start.Value.Day, DateTime.DaysInMonth(now.Year, interval.Start.Value.Month)); var eDay = Math.Min(interval.End.Value.Day, DateTime.DaysInMonth(now.Year, interval.End.Value.Month)); var s = new DateTime(now.Year, interval.Start.Value.Month, sDay); var e = new DateTime(now.Year, interval.End.Value.Month, eDay); if (e < s) e = e.AddYears(1); if (now.Date >= s.Date && now.Date <= e.Date) match = true; } }
+                else if (interval.Type == "EveryYear")
+                {
+                    if (interval.Start.HasValue && interval.End.HasValue)
+                    {
+                        var sDay = Math.Min(interval.Start.Value.Day, DateTime.DaysInMonth(now.Year, interval.Start.Value.Month));
+                        var eDay = Math.Min(interval.End.Value.Day, DateTime.DaysInMonth(now.Year, interval.End.Value.Month));
+                        var s = new DateTime(now.Year, interval.Start.Value.Month, sDay);
+                        var e = new DateTime(now.Year, interval.End.Value.Month, eDay);
+                        var today = now.Date;
+                        // A window that wraps the new year (e.g. Dec 27 → Jan 3) is active from its start
+                        // through Dec 31 and again from Jan 1 through its end.
+                        match = e >= s ? today >= s && today <= e : today >= s || today <= e;
+                    }
+                }
                 else { if ((!interval.Start.HasValue || now.Date >= interval.Start.Value.Date) && (!interval.End.HasValue || now.Date <= interval.End.Value.Date)) match = true; }
                 if (match) return true;
             }
@@ -3719,6 +3752,11 @@ namespace HomeScreenCompanion
                 }
                 catch { }
             }
+
+            // Never let the group's own output tag satisfy its Tag: criteria (see _writtenTags).
+            var ownTag = tagConfig.Tag?.Trim();
+            if (!string.IsNullOrEmpty(ownTag) && _writtenTags.Contains(ownTag))
+                itemTags = itemTags.Where(t => !string.Equals(t, ownTag, StringComparison.OrdinalIgnoreCase)).ToArray();
 
             if (hasFilters)
             {
@@ -3967,7 +4005,9 @@ namespace HomeScreenCompanion
             {
                 double? v = parts[0] switch
                 {
-                    "CommunityRating" => (double?)item.CommunityRating,
+                    // float → double without rounding turns 7.2 into 7.1999998…, so ">= 7.2" would skip
+                    // exact 7.2s (and 6.9 into 6.9000001…). Ratings have at most 3 decimals.
+                    "CommunityRating" => item.CommunityRating.HasValue ? Math.Round((double)item.CommunityRating.Value, 4) : (double?)null,
                     "Year"            => (double?)item.ProductionYear,
                     "Runtime"         => item.RunTimeTicks.HasValue
                                         ? (double?)(item.RunTimeTicks.Value / TimeSpan.TicksPerMinute) : null,
