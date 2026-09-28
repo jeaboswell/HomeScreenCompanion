@@ -218,11 +218,14 @@ namespace HomeScreenCompanion
 
                         // Find the original (non-top-list) movies that share this IMDb id — several
                         // when versions are separate items; the first is the merge target.
+                        // Runs once per indexed .strm, so query by IMDb id rather than loading
+                        // every movie; the Where() below keeps the result exact regardless.
                         var originals = _libraryManager.GetItemList(new InternalItemsQuery
                         {
                             IncludeItemTypes = new[] { "Movie" },
                             Recursive = true,
-                            IsVirtualItem = false
+                            IsVirtualItem = false,
+                            AnyProviderIdEquals = new List<KeyValuePair<string, string>> { new KeyValuePair<string, string>("Imdb", imdb) }
                         }).Where(m => m.Id != itemId
                             && !string.IsNullOrEmpty(m.Path)
                             && !m.Path.StartsWith(topListsFolder, StringComparison.OrdinalIgnoreCase)

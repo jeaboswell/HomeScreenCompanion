@@ -69,26 +69,52 @@ namespace HomeScreenCompanion
             (item.Collections ?? Array.Empty<MediaBrowser.Model.Dto.LinkedItemInfo>())
                 .Where(c => c != null && c.Id > 0).Select(c => c.Id).Distinct().ToArray();
 
-        // One library query → originals and copies grouped by IMDb id. A film can have several
+        private static void AddTo(Dictionary<string, List<BaseItem>> map, string key, BaseItem item)
+        {
+            if (!map.TryGetValue(key, out var list)) map[key] = list = new List<BaseItem>();
+            list.Add(item);
+        }
+
+        // Copies and (optionally) their originals, grouped by IMDb id. A film can have several
         // originals (separate 1080p/4K items), so each IMDb id maps to a list. Copies without an
         // IMDb id are grouped under "" (no original ever matches that key).
-        private static (Dictionary<string, List<BaseItem>> Originals, Dictionary<string, List<BaseItem>> Copies) BuildLookups()
+        //
+        // Never loads the whole movie library: copies come from the top-list folder, originals
+        // from an IMDb-id query for just those copies. Each query's Where() keeps the result
+        // exact even if a server version ignored the narrowing field.
+        private static (Dictionary<string, List<BaseItem>> Originals, Dictionary<string, List<BaseItem>> Copies) BuildLookups(bool withOriginals)
         {
             var originals = new Dictionary<string, List<BaseItem>>(StringComparer.OrdinalIgnoreCase);
             var copies = new Dictionary<string, List<BaseItem>>(StringComparer.OrdinalIgnoreCase);
+            var folder = TopListsFolder;
+            if (folder == null) return (originals, copies);
+
             foreach (var m in _libraryManager!.GetItemList(new InternalItemsQuery
             {
                 IncludeItemTypes = new[] { "Movie" },
                 Recursive = true,
-                IsVirtualItem = false
-            }))
+                IsVirtualItem = false,
+                PathStartsWith = folder
+            }).Where(IsTopListItem))
+                AddTo(copies, m.GetProviderId("Imdb") ?? "", m);
+
+            if (!withOriginals) return (originals, copies);
+            var imdbs = copies.Keys.Where(k => k.Length > 0).ToList();
+            for (int i = 0; i < imdbs.Count; i += 100)
             {
-                var imdb = m.GetProviderId("Imdb") ?? "";
-                bool isCopy = IsTopListItem(m);
-                if (imdb.Length == 0 && !isCopy) continue;
-                var target = isCopy ? copies : originals;
-                if (!target.TryGetValue(imdb, out var list)) target[imdb] = list = new List<BaseItem>();
-                list.Add(m);
+                var chunk = imdbs.Skip(i).Take(100).ToList();
+                var wanted = new HashSet<string>(chunk, StringComparer.OrdinalIgnoreCase);
+                foreach (var m in _libraryManager.GetItemList(new InternalItemsQuery
+                {
+                    IncludeItemTypes = new[] { "Movie" },
+                    Recursive = true,
+                    IsVirtualItem = false,
+                    AnyProviderIdEquals = chunk.Select(id => new KeyValuePair<string, string>("Imdb", id)).ToList()
+                }))
+                {
+                    var imdb = m.GetProviderId("Imdb") ?? "";
+                    if (!IsTopListItem(m) && wanted.Contains(imdb)) AddTo(originals, imdb, m);
+                }
             }
             return (originals, copies);
         }
@@ -140,7 +166,7 @@ namespace HomeScreenCompanion
             await _mirrorLock.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                var (originals, copies) = BuildLookups();
+                var (originals, copies) = BuildLookups(withOriginals: true);
                 int changes = 0;
                 foreach (var kv in copies)
                 {
@@ -231,7 +257,7 @@ namespace HomeScreenCompanion
             try
             {
                 if (!Enabled) return 0;
-                var (_, copiesByImdb) = BuildLookups();
+                var (_, copiesByImdb) = BuildLookups(withOriginals: false);
                 int changes = 0;
                 foreach (var collId in collectionIds)
                 {

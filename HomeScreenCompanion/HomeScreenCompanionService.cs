@@ -1285,11 +1285,14 @@ public class HomeScreenCompanionService : IService
                 if (!folderPrefix.StartsWith(topListsFolder, StringComparison.OrdinalIgnoreCase))
                     return new TopListIndexStatusResponse { Success = false, Message = "FolderPath is not a top-list folder." };
 
+                // Polled every 2 s — let the database narrow to the folder instead of loading every
+                // movie. The Where() stays as a safety net and keeps the result exact.
                 var items = _libraryManager.GetItemList(new InternalItemsQuery
                 {
                     IncludeItemTypes = new[] { "Movie" },
                     Recursive = true,
-                    IsVirtualItem = false
+                    IsVirtualItem = false,
+                    PathStartsWith = folderPrefix
                 }).Where(i => !string.IsNullOrEmpty(i.Path)
                            && i.Path.StartsWith(folderPrefix, StringComparison.OrdinalIgnoreCase))
                   .ToList();
