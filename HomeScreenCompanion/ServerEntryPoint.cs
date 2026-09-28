@@ -47,6 +47,12 @@ namespace HomeScreenCompanion
             TagCacheManager.Instance.Initialize(Plugin.Instance.DataFolderPath, _jsonSerializer);
             TopListCollectionMirror.Initialize(_libraryManager, _collectionManager, _logger);
 
+            // Last run logs survive a restart (shown in the log modal and "Last run").
+            LogStore.Initialize(Plugin.Instance.DataFolderPath, _jsonSerializer);
+            HomeScreenCompanionTask.RestoreLog();
+            HomeSectionSyncTask.RestoreLog();
+            TopListSyncTask.RestoreLog();
+
             _libraryManager.ItemAdded += OnItemChanged;
             _libraryManager.ItemUpdated += OnItemChanged;
             _collectionManager.CollectionCreated += OnCollectionCreated;

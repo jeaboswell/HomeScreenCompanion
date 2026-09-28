@@ -60,6 +60,7 @@ namespace HomeScreenCompanion
             finally
             {
                 IsRunning = false;
+                PersistLog(); // again, so the abort line above is included
             }
             return Task.CompletedTask;
         }
@@ -163,6 +164,22 @@ namespace HomeScreenCompanion
             return own;
         }
 
+        private static void PersistLog() => LogStore.Save(LogStore.TopLists, ExecutionLog, LastRunStatus, LastStartedUtc);
+
+        // Brings back the last run's log and status after a server restart.
+        internal static void RestoreLog()
+        {
+            var saved = LogStore.Load(LogStore.TopLists);
+            if (saved == null || IsRunning) return;
+            lock (ExecutionLog)
+            {
+                if (ExecutionLog.Count > 0) return;
+                ExecutionLog.AddRange(saved.Lines ?? new List<string>());
+            }
+            LastRunStatus = LogStore.RestoredStatus(saved.Status);
+            LastStartedUtc = saved.StartedUtc;
+        }
+
         internal static (int updated, string message) SyncAll(
             ILibraryManager libraryManager,
             IUserViewManager userViewManager,
@@ -171,6 +188,34 @@ namespace HomeScreenCompanion
             ILogger logger,
             CancellationToken cancellationToken,
             RunLog? log = null)
+        {
+            // Inside the main sync the lines belong to that run's log, which it saves itself.
+            if (log != null)
+                return SyncAllCore(libraryManager, userViewManager, userManager, jsonSerializer, logger, cancellationToken, log);
+
+            // Standalone (scheduled task or the UI): this task's own log — keep it across restarts.
+            try
+            {
+                var result = SyncAllCore(libraryManager, userViewManager, userManager, jsonSerializer, logger, cancellationToken, null);
+                LastRunStatus = result.message;
+                return result;
+            }
+            catch (Exception ex)
+            {
+                LastRunStatus = $"Error: {ex.Message}";
+                throw;
+            }
+            finally { PersistLog(); }
+        }
+
+        private static (int updated, string message) SyncAllCore(
+            ILibraryManager libraryManager,
+            IUserViewManager userViewManager,
+            IUserManager userManager,
+            IJsonSerializer jsonSerializer,
+            ILogger logger,
+            CancellationToken cancellationToken,
+            RunLog? log)
         {
             var config = Plugin.Instance?.Configuration;
             var startTime = DateTime.Now;

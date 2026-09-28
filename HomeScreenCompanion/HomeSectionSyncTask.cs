@@ -25,6 +25,30 @@ namespace HomeScreenCompanion
         public static DateTime? LastStartedUtc { get; private set; }
         private RunLog _log;
 
+        private static void PersistLog() => LogStore.Save(LogStore.HomeScreen, ExecutionLog, LastSyncResult, LastStartedUtc,
+            new Dictionary<string, string>
+            {
+                ["LastSyncTime"] = LastSyncTime,
+                ["SectionsCopied"] = LastSectionsCopied.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            });
+
+        // Brings back the last run's log and status after a server restart.
+        internal static void RestoreLog()
+        {
+            var saved = LogStore.Load(LogStore.HomeScreen);
+            if (saved == null || IsRunning) return;
+            lock (ExecutionLog)
+            {
+                if (ExecutionLog.Count > 0) return;
+                ExecutionLog.AddRange(saved.Lines ?? new List<string>());
+            }
+            LastSyncResult = LogStore.RestoredStatus(saved.Status);
+            LastStartedUtc = saved.StartedUtc;
+            var extra = saved.Extra ?? new Dictionary<string, string>();
+            if (extra.TryGetValue("LastSyncTime", out var t) && !string.IsNullOrEmpty(t)) LastSyncTime = t;
+            if (extra.TryGetValue("SectionsCopied", out var c) && int.TryParse(c, out var n)) LastSectionsCopied = n;
+        }
+
         public HomeSectionSyncTask(IUserManager userManager, ILogManager logManager)
         {
             _userManager = userManager;
@@ -220,6 +244,7 @@ namespace HomeScreenCompanion
             finally
             {
                 IsRunning = false;
+                PersistLog();
             }
 
             return Task.CompletedTask;

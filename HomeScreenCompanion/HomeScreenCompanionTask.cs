@@ -38,10 +38,26 @@ namespace HomeScreenCompanion
         private RunLog _log;
 
         public static HomeScreenCompanionTask? Instance { get; private set; }
-        public static string LastRunStatus { get; private set; } = "Unknown (resets at server restart)";
+        public static string LastRunStatus { get; private set; } = "Never";
         public static List<string> ExecutionLog { get; } = new List<string>();
         public static bool IsRunning { get; private set; } = false;
         public static DateTime? LastStartedUtc { get; private set; }
+
+        private static void PersistLog() => LogStore.Save(LogStore.Sync, ExecutionLog, LastRunStatus, LastStartedUtc);
+
+        // Brings back the last run's log and status after a server restart.
+        internal static void RestoreLog()
+        {
+            var saved = LogStore.Load(LogStore.Sync);
+            if (saved == null || IsRunning) return;
+            lock (ExecutionLog)
+            {
+                if (ExecutionLog.Count > 0) return;
+                ExecutionLog.AddRange(saved.Lines ?? new List<string>());
+            }
+            LastRunStatus = LogStore.RestoredStatus(saved.Status);
+            LastStartedUtc = saved.StartedUtc;
+        }
 
         private struct CachedMediaInfo
         {
@@ -1501,7 +1517,7 @@ namespace HomeScreenCompanion
                 _log.Error($"Sync aborted: {ex.Message}");
                 WriteExceptionDebug(ex);
             }
-            finally { IsRunning = false; }
+            finally { IsRunning = false; PersistLog(); }
         }
 
         public async Task<(bool Success, string Message)> RunSingleEntryAsync(string entryName, CancellationToken cancellationToken)
@@ -1517,6 +1533,7 @@ namespace HomeScreenCompanion
             finally
             {
                 IsRunning = false;
+                PersistLog();
             }
         }
 
