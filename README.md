@@ -21,6 +21,7 @@ Whether you want to pull trending lists from Trakt, build smart dynamic playlist
 - **Dynamic Home Screen Sections:** Automatically inject dedicated rows onto the home screen based on tags or collections. The plugin creates, updates, and cleans them up automatically.
 - **Home Screen Sync:** Created the perfect home screen layout? Sync it to all your other users with a single click—or keep it synced automatically!
 - **User Playlists:** Create and sync dynamic Emby Playlists directly to specific users based on any of your sources.
+- **Continue watching bump:** Never miss a new season premiere! Enables new seasons and/or episode releases to bump up the show to first position in the continue watching
 
 ---
 
@@ -71,6 +72,15 @@ Add a custom row to the home screen for any specific tag or collection. The plug
 Ever get frustrated trying to give all your users the same great home screen experience?
 With **Home Screen Sync**, you choose one user as the "Master" and copy their entire home screen layout to any (or all) other users. You can even set it to sync automatically in the background!
 
+### Continue watching bump
+This is a workaround to highlight for the user that a new episode/season has been added. For example, if the user have watched all episode of a show up until s03e09 (season finale). It might then take a year or two before s04e01 is released, and the show will get buried way down in the continue watched, This function manipulates the "LastPlayedDate" for s03e09 to look like the user just played it.
+In this way s04e01 will be placed as the first item in the continue watching row.
+This bump will only happen once, and if the user doesn't watch the show, it will gradually move down the continue watching list.
+
+When enabled the function auto-detects new seasons and apply the setting. There is also a new scheduled task to catch anything that has been missed (runs default every 6 hour).
+
+You as an admin can select if this should apply to only new seasons, or between all episodes.
+
 ---
 
 ## 🛡️ Safety & Reliability
@@ -85,7 +95,9 @@ With **Home Screen Sync**, you choose one user as the "Master" and copy their en
 ---
 
 ## ⚙️ Installation & Setup
+The plugin can be found in the plugin catalogue. 
 
+Manual install:
 1. Download the latest `.dll` file from the [Releases](../../releases) page.
 2. Shut down your Emby Server.
 3. Place the `.dll` file in your Emby `plugins` folder.
